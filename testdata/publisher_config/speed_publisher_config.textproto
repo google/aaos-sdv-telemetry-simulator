@@ -1,0 +1,32 @@
+# Copyright 2024 Google LLC
+
+service_name: "SimulationSpeedPublisher"
+data_format_protos {
+    message_type {
+        name: "SpeedData"
+        field {
+            name: "speed"
+            number: 1
+            type: TYPE_INT32
+            json_name: "speed"
+        }
+        field {
+            name: "above_speed_limit"
+            number: 2
+            type: TYPE_BOOL
+            json_name: "aboveSpeedLimit"
+        }
+    }
+}
+data_format_message_name: ".SpeedData"
+data_generators {
+    loop_data: true
+    default_delay {
+        seconds: 1
+        nanos: 0
+    }
+    csv_file {
+        file_path: "/data/local/tmp/speed_publisher_data.csv"
+        delimiter: ","
+    }
+}

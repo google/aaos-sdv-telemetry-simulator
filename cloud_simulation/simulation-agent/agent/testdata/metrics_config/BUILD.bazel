@@ -1,0 +1,38 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("//build:proto.bzl", "txtpb_to_binpb")
+
+filegroup(
+    name = "metrics_configs",
+    testonly = True,
+    srcs = glob(["**/*.txtpb"]),
+    visibility = ["//visibility:public"],
+)
+
+[
+    txtpb_to_binpb(
+        name = "compile_metrics_config_%s" % config_name,
+        testonly = True,
+        src = "%s.txtpb" % config_name,
+        out = "%s.pb" % config_name,
+        message_name = "google.sdv.telemetry.MetricsConfig",
+        proto_target = "//third_party/aosp/sdv/telemetry/metrics_configuration:telemetry_proto",
+    )
+    for config_name in [
+        "average_speed_vector",
+        "average_speed",
+        "journey_summary",
+    ]
+]

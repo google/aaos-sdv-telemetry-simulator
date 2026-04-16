@@ -1,0 +1,39 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+load("@rules_go//proto:def.bzl", "go_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+# gazelle:proto package
+
+proto_library(
+    name = "simulator_proto",
+    srcs = [
+        "simulation_actions.proto",
+        "simulation_publisher.proto",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@protobuf_src//:any_proto",
+        "@protobuf_src//:descriptor_proto",
+        "@protobuf_src//:duration_proto",
+    ],
+)
+
+go_proto_library(
+    name = "google_sdv_telemetry_go_proto",
+    importpath = "simulator.code/third_party/aosp/sdv/telemetry/simulator",
+    proto = ":simulator_proto",
+    visibility = ["//visibility:public"],
+)

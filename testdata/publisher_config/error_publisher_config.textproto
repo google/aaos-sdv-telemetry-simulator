@@ -1,0 +1,67 @@
+# Copyright 2024 Google LLC
+
+service_name: "SimulationErrorPublisher"
+data_format_protos {
+    message_type {
+        name: "ErrorReport"
+        field {
+            type: TYPE_STRING
+            name: "title"
+            number: 1
+        }
+        field {
+            type: TYPE_STRING
+            name: "description"
+            number: 2
+        }
+        field {
+            name: "details"
+            number: 3
+            type: TYPE_MESSAGE
+            type_name: ".ErrorDetails"
+        }
+    }
+
+    message_type {
+        name: "ErrorDetails"
+        field {
+            type: TYPE_INT32
+            name: "severity"
+            number: 1
+        }
+        field {
+            type: TYPE_ENUM
+            name: "urgency"
+            type_name: ".Urgency"
+            number: 2
+        }
+    }
+
+    enum_type {
+        name: "Urgency"
+        value {
+            name: "HIGH"
+            number: 0
+        }
+        value {
+            name: "MEDIUM"
+            number: 1
+        }
+        value {
+            name: "LOW"
+            number: 2
+        }
+    }
+}
+data_format_message_name: ".ErrorReport"
+data_generators {
+    loop_data: true
+    default_delay {
+        seconds: 5
+        nanos: 0
+    }
+    csv_file {
+        file_path: "/data/local/tmp/error_publisher_data.csv"
+        delimiter: ","
+    }
+}

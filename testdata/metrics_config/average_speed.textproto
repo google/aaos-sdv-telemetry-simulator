@@ -1,0 +1,90 @@
+# Copyright 2024 Google LLC
+#
+# Every 60 seconds, report the average vehicle speed
+
+uuid: "aa27583c-96a5-4a67-adad-d15e00c0f12a"
+version: 1
+
+descriptor_protos {
+    message_type {
+        name: "SpeedData"
+        field {
+            type: TYPE_DOUBLE
+            name: "average_speed"
+            number: 1
+        }
+    }
+}
+
+triggers {
+    name: "new_speed_data"
+    data_trigger {
+        source_name: "speed_publisher"
+    }
+}
+
+triggers {
+    name: "report_trigger"
+    periodic_trigger {
+        interval {
+            seconds: 60
+            nanos: 0
+        }
+    }
+}
+
+sources {
+    name: "speed_publisher"
+    data_source {
+        source_identifier: "SimulationSpeedPublisher"
+    }
+}
+
+sources {
+    name: "average_speed_aggregation"
+    aggregator {
+        trigger_names: "new_speed_data"
+        reset_on_get: true
+        message_builder {
+            message_type: ".SpeedData"
+            field_assignments {
+                field_name: "average_speed"
+                avg_aggregation {
+                    expression_node_index: 0
+                }
+            }
+        }
+    }
+}
+
+# index 0
+expression_nodes {
+    field_leaf_node {
+        source_name: "speed_publisher"
+        field_names: "speed"
+      }
+}
+
+# index 1
+expression_nodes {
+    field_leaf_node {
+        source_name: "average_speed_aggregation"
+        field_names: "average_speed"
+      }
+  }
+
+metrics_report_configs {
+    name: "average_speed_last_60s"
+    trigger_names: "report_trigger"
+    report_incomplete: false
+
+    message_builder {
+        message_type: ".SpeedData"
+        field_assignments {
+            field_name: "average_speed"
+            no_aggregation {
+                expression_node_index: 1
+            }
+        }
+    }
+}

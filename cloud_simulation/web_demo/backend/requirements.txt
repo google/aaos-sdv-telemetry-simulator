@@ -1,0 +1,6 @@
+Flask==3.1.1
+Flask-Cors==6.0.0
+requests==2.32.3
+google-auth==2.40.2
+gunicorn==23.0.0
+google-cloud-storage==3.1.0

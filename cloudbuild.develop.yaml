@@ -1,0 +1,170 @@
+# Copyright 2025 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+steps:
+  # 0. Determine Environment
+  # This step determines the deployment environment based on the git branch name.
+  # It writes the environment name to a workspace file to be used by subsequent steps.
+  - name: 'alpine'
+    id: 'Determine Environment'
+    entrypoint: 'sh'
+    args:
+      - -c
+      - |
+        if [ "${_BRANCH_NAME}" = "main" ]; then
+          printf "prod" > /workspace/environment.txt
+        else
+          printf "staging" > /workspace/environment.txt
+        fi
+
+  # 0b. Fetch Private Configs from GCS
+  # This step replaces the files removed from the repo by downloading them from a private bucket.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Fetch Configs'
+    entrypoint: 'bash'
+    args:
+      - -c
+      - |
+        _ENVIRONMENT=$(cat /workspace/environment.txt)
+        mkdir -p cloud_simulation/infrastructure/environments/$${_ENVIRONMENT}
+        echo "Downloading configs for $${_ENVIRONMENT} from gs://${_CONFIG_BUCKET}..."
+
+        gsutil cp gs://${_CONFIG_BUCKET}/$${_ENVIRONMENT}/backend.hcl \
+          cloud_simulation/infrastructure/environments/$${_ENVIRONMENT}/backend.hcl
+
+        gsutil cp gs://${_CONFIG_BUCKET}/$${_ENVIRONMENT}/variables.tfvars \
+          cloud_simulation/infrastructure/environments/$${_ENVIRONMENT}/variables.tfvars
+
+  # 1. Detect changes
+  # This step checks which directories have changed in the last commit.
+  # It writes sentinel files to /workspace to signal which parts of the
+  # pipeline should be executed.
+  - name: 'gcr.io/cloud-builders/git'
+    id: 'Detect Changes'
+    entrypoint: 'bash'
+    env:
+     - _BRANCH_NAME=${_BRANCH_NAME}
+     - _SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}
+    args: ['pipeline_scripts/detect_git_changes.sh']
+
+  # 2. Deploy Infrastructure (if changed)
+  # This step runs only if the 'Detect Changes' step found modifications
+  # in the 'infrastructure/' or 'orchestrator/' directories.
+  - name: 'hashicorp/terraform:1.11.4'
+    id: 'Terraform Apply'
+    entrypoint: 'sh'
+    args:
+      - -c
+      - |
+        export _ENVIRONMENT=$(cat /workspace/environment.txt)
+        if [ -f /workspace/tf_changed ] || [ -f /workspace/functions_changed ]; then
+          sh ./pipeline_scripts/terraform_actions.sh apply
+        else
+          echo "No infrastructure changes to apply.";
+        fi
+
+  # 2a. Fetch Terraform Outputs
+  # This step always runs to get the latest output values from the Terraform state
+  # for the environment. These values are used by subsequent steps.
+  - name: 'hashicorp/terraform:1.11.4'
+    id: 'Fetch Terraform Outputs'
+    entrypoint: 'sh'
+    args:
+      - -c
+      - |
+        export _ENVIRONMENT=$(cat /workspace/environment.txt)
+        sh ./pipeline_scripts/terraform_actions.sh outputs
+
+  # 3. Deploy Web Demo to App Engine (if changed)
+  # This step substitutes variables into app.yaml and assets/config.json for the Flutter Config Service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Prep Web Assets'
+    entrypoint: 'bash'
+    env:
+     - _WEB_CLIENT_ID=${_WEB_CLIENT_ID}
+     - PROJECT_ID=${PROJECT_ID}
+    args:
+      - -c
+      - |
+       export _ENVIRONMENT=$(cat /workspace/environment.txt)
+       if [ -f /workspace/web_changed ] || [ -f /workspace/tf_changed ] || [ -f /workspace/functions_changed ]; then
+          export _APP_ENGINE_BACKEND_URL="https://backend-$${_ENVIRONMENT}-dot-cloud-telemetry-simulation.ey.r.appspot.com/"
+          sh ./pipeline_scripts/web_deploy.sh prep_assets
+       else
+          echo "No Web Demo assets to prepare.";
+       fi
+
+  # Step 3b: Build the Flutter web application.
+  - name: 'ghcr.io/cirruslabs/flutter:stable'
+    id: 'Build Flutter Web'
+    entrypoint: 'bash'
+    waitFor: ['Fetch Terraform Outputs']
+    args:
+      - -c
+      - |
+        _ENVIRONMENT=$(cat /workspace/environment.txt)
+        if [ -f /workspace/web_changed ] || [ -f /workspace/tf_changed ] || [ -f /workspace/functions_changed ]; then
+          cd cloud_simulation/web_demo/frontend
+          flutter build web --release
+        else
+          echo "No Web Demo changes to build.";
+        fi
+
+  # Step 3c: Deploy the frontend and backend services to App Engine.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Web Demo'
+    entrypoint: 'bash'
+    waitFor:
+      - 'Prep Web Assets'
+      - 'Build Flutter Web'
+    args:
+      - -c
+      - |
+        export _ENVIRONMENT=$(cat /workspace/environment.txt)
+        if [ -f /workspace/web_changed ] || [ -f /workspace/tf_changed ] || [ -f /workspace/functions_changed ]; then
+          sh ./pipeline_scripts/web_deploy.sh deploy
+        else
+          echo "No Web Demo changes to deploy.";
+        fi
+
+  # Validation Step
+  - name: 'eu.gcr.io/cloud-telemetry-simulation/bazel:7.2.1'
+    id: 'Deployment Validation'
+    waitFor:
+     - 'Deploy Web Demo'
+    entrypoint: 'bash'
+    args:
+     - -c
+     - |
+       _ENVIRONMENT=$(cat /workspace/environment.txt)
+       bazel test \
+         //pipeline_scripts/deployment_validation:deployment_validation_test \
+         --remote_cache=https://storage.googleapis.com/${_BAZEL_CACHE_BUCKET}/simulator \
+         --google_default_credentials \
+         --remote_upload_local_results=true \
+         --test_output=streamed \
+         --test_arg=--project-id=${PROJECT_ID} \
+         --test_arg=--owner=cloud-build-automated@${PROJECT_ID}.iam.gserviceaccount.com \
+         --test_arg=--environment=$${_ENVIRONMENT} \
+         --test_arg=--service-url=https://backend-$${_ENVIRONMENT}-dot-cloud-telemetry-simulation.ey.r.appspot.com/api/scheduleSimulation \
+         --test_arg=--web-client-id=${_WEB_CLIENT_ID}
+
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  automapSubstitutions: true
+  substitutionOption: 'ALLOW_LOOSE'
+  machineType: 'E2_HIGHCPU_32'
+
+serviceAccount: 'projects/cloud-telemetry-simulation/serviceAccounts/${_SERVICE_ACCOUNT}'

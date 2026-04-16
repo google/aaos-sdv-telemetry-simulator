@@ -1,0 +1,134 @@
+# Copyright 2024 Google LLC
+
+uuid: "aa27583c-96a5-4a67-adad-d15e00c0f12b"
+version: 1
+
+descriptor_protos {
+    package: "aaos.sdv.telemetry.adhoc"
+    message_type {
+        name: "SpeedData"
+        field {
+            type: TYPE_DOUBLE
+            name: "average_speed"
+            number: 1
+        }
+    }
+
+    message_type {
+        name: "SpeedDataList"
+        field {
+            type: TYPE_DOUBLE
+            label: LABEL_REPEATED
+            name: "average_speed"
+            number: 1
+        }
+    }
+}
+
+triggers {
+    name: "new_speed_data"
+    data_trigger {
+        source_name: "speed_publisher"
+    }
+}
+
+triggers {
+    name: "every_second"
+    periodic_trigger {
+        interval {
+            seconds: 1
+            nanos: 0
+        }
+    }
+}
+
+triggers {
+    name: "regular_trigger"
+    periodic_trigger {
+        interval {
+            seconds: 10
+            nanos: 0
+        }
+    }
+}
+
+sources {
+    name: "speed_publisher"
+    data_source {
+        source_identifier: "SimulationSpeedPublisher"
+    }
+}
+
+sources {
+    name: "average_speed_aggregation"
+    aggregator {
+        trigger_names: "new_speed_data"
+        reset_on_get: true
+        message_builder {
+            message_type: ".aaos.sdv.telemetry.adhoc.SpeedData"
+            field_assignments {
+                field_name: "average_speed"
+                avg_aggregation {
+                    expression_node_index: 0
+                }
+            }
+        }
+    }
+}
+
+sources {
+    name: "average_speed_list_aggregation"
+    aggregator {
+        trigger_names: "every_second"
+        reset_on_get: true
+        message_builder {
+            message_type: ".aaos.sdv.telemetry.adhoc.SpeedDataList"
+            field_assignments {
+                field_name: "average_speed"
+                vector_aggregation {
+                    expression_node_index: 1
+                }
+            }
+        }
+    }
+}
+
+# index 0
+expression_nodes {
+    field_leaf_node {
+        source_name: "speed_publisher"
+        field_names: "speed"
+      }
+}
+
+# index 1
+expression_nodes {
+    field_leaf_node {
+        source_name: "average_speed_aggregation"
+        field_names: "average_speed"
+      }
+  }
+
+  # index 2
+expression_nodes {
+    field_leaf_node {
+        source_name: "average_speed_list_aggregation"
+        field_names: "average_speed"
+      }
+  }
+
+metrics_report_configs {
+    name: "average_speed_list"
+    trigger_names: "regular_trigger"
+    report_incomplete: true
+
+    message_builder {
+        message_type: ".aaos.sdv.telemetry.adhoc.SpeedDataList"
+        field_assignments {
+            field_name: "average_speed"
+            no_aggregation {
+                expression_node_index: 2
+            }
+        }
+    }
+}

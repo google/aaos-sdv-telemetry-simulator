@@ -1,0 +1,6 @@
+common --enable_bzlmod
+# This is needed to avoid constant rebuilds if environment variables change.
+# This happens, e.g., when VSCode runs a Bazel command with a different PATH
+# environment variable then when you run a Bazel command in your terminal.
+common --incompatible_strict_action_env
+common --incompatible_disallow_empty_glob

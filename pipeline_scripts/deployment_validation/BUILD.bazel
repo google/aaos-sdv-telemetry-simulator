@@ -1,0 +1,44 @@
+# Copyright 2025 Google LLC
+
+# gazelle:prefix simulator.code/deployment_validation
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "deployment_validation_lib",
+    srcs = ["main.go"],
+    importpath = "simulator.code/deployment_validation",
+    visibility = ["//visibility:private"],
+    deps = [
+        "@com_google_cloud_go_compute//apiv1",
+        "@com_google_cloud_go_compute//apiv1/computepb",
+        "@com_google_cloud_go_firestore//:firestore",
+        "@com_google_cloud_go_functions//apiv2",
+        "@com_google_cloud_go_functions//apiv2/functionspb",
+        "@com_google_cloud_go_storage//:storage",
+        "@org_golang_google_api//idtoken",
+        "@org_golang_google_api//iterator",
+    ],
+)
+
+go_binary(
+    name = "deployment_validation",
+    embed = [":deployment_validation_lib"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "deployment_validation_test",
+    timeout = "long",
+    srcs = ["main_test.go"],
+    args = [
+        "--local-test-files-dir=_main/testdata",
+    ],
+    data = [
+        "//testdata:exported_testdata",
+    ],
+    embed = [":deployment_validation_lib"],
+    tags = ["manual"],
+    deps = [
+        "@rules_go//go/runfiles",
+    ],
+)

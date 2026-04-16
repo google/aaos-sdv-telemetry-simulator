@@ -1,0 +1,6 @@
+{
+    "webClientId": "__WEB_CLIENT_ID__",
+    "firestoreApiBaseUrl": "https://firestore.googleapis.com/v1/__DATABASE_ID__/documents",
+    "backendUrl": "__BACKEND_URL__",
+    "bucketName": "__SIMULATION_FILES_BUCKET_NAME__"
+}

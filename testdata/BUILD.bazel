@@ -1,0 +1,29 @@
+# Copyright 2025 Google LLC
+
+load("@rules_pkg//:pkg.bzl", "pkg_zip")
+
+filegroup(
+    name = "exported_testdata",
+    testonly = True,
+    srcs = [
+        ":metrics_config",
+        ":publisher_config",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+pkg_zip(
+    name = "metrics_config",
+    testonly = True,
+    srcs = [
+        "//testdata/metrics_config:metrics_configs",
+    ],
+)
+
+pkg_zip(
+    name = "publisher_config",
+    testonly = True,
+    srcs = [
+        "//testdata/publisher_config:publisher_configs",
+    ],
+)

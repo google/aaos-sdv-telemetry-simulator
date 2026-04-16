@@ -1,0 +1,39 @@
+# Copyright 2025 Google LLC
+
+# gazelle:prefix simulator.code/simulation-reader
+
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+load("//build:gomock.bzl", "go_mock_library")
+
+go_library(
+    name = "simulation-reader",
+    srcs = ["reader.go"],
+    importpath = "simulator.code/simulation-reader",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cloud_simulation/orchestrator/read-simulation/firestore",
+        "@org_golang_google_grpc//status",
+    ],
+)
+
+go_test(
+    name = "simulation-reader_test",
+    srcs = ["reader_test.go"],
+    embed = [":simulation-reader"],
+    deps = [
+        ":mock",
+        "//cloud_simulation/orchestrator/read-simulation/firestore",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)
+
+go_mock_library(
+    name = "mock",
+    src = "reader.go",
+    importpath = "simulator.code/simulation-reader/mock",
+    deps = [
+        "//cloud_simulation/orchestrator/read-simulation/firestore",
+    ],
+)

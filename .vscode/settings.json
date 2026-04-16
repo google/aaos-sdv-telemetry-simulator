@@ -1,0 +1,39 @@
+{
+  "[go]": {
+    "editor.tabSize": 4
+  },
+  "go.toolsEnvVars": {
+    "GOPACKAGESDRIVER": "${workspaceFolder}/build/gopackagesdriver.sh"
+  },
+  "go.enableCodeLens": {
+    "runtest": false
+  },
+  "gopls": {
+    "build.directoryFilters": [
+      "-bazel-bin",
+      "-bazel-out",
+      "-bazel-testlogs",
+      "-bazel-mypkg",
+    ],
+    "formatting.gofumpt": true,
+    "formatting.local": "sdv.googlesource.com/cloud_telemetry_simulation",
+    "ui.completion.usePlaceholders": true,
+    "ui.semanticTokens": true,
+    "ui.codelenses": {
+      "gc_details": false,
+      "regenerate_cgo": false,
+      "generate": false,
+      "test": false,
+      "tidy": false,
+      "upgrade_dependency": false,
+      "vendor": false
+    },
+  },
+  "go.useLanguageServer": true,
+  "go.lintOnSave": "off",
+  "go.vetOnSave": "off",
+  "bazel.executable": "bazel",
+  "bazel.enableCodeLens": true,
+  "bazel.buildifierExecutable": "@//tools:buildifier",
+  "bazel.buildifierFixOnFormat": true,
+}
