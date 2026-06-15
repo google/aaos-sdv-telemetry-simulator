@@ -65,7 +65,6 @@ func (sr *SimulationRequest) Validate() error {
 	return nil
 }
 
-
 type receiver struct {
 	requestID       string
 	firestoreClient firestore.Client

@@ -38,7 +38,6 @@ type FinishRequest struct {
 	Status     string `json:"status"`
 }
 
-
 // Finisher defines the interface for the core simulation finalization logic.
 type Finisher interface {
 	FinishSimulation(ctx context.Context, projectID string, zone string, instanceID string, documentID string, simulationStatus firestore.SimulationStatus) error

@@ -34,7 +34,6 @@ const (
 	EnvFirestoreDatabase = "FIRESTORE_DATABASE"
 )
 
-
 type CancellationRequest struct {
 	ID string `json:"id"`
 }

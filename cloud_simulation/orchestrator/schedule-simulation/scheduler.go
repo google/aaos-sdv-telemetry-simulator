@@ -28,7 +28,6 @@ import (
 	"simulator.code/simulation-scheduler/pubsub"
 )
 
-
 type scheduler struct {
 	firestoreClient firestore.Client
 	computeClient   compute.Client

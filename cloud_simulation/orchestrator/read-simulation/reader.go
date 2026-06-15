@@ -28,7 +28,6 @@ import (
 	"simulator.code/simulation-reader/firestore"
 )
 
-
 type firestoreClient interface {
 	GetSimulation(ctx context.Context, id string) (*firestore.Simulation, error)
 	GetCounter(ctx context.Context) (int, error)
