@@ -14,6 +14,7 @@
 # limitations under the License.
 
 set -euo pipefail
+shopt -s globstar
 
 REPO_PATH="${KOKORO_ARTIFACTS_DIR}/git/cloud_telemetry_simulation"
 cd "${REPO_PATH}"
