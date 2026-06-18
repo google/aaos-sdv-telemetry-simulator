@@ -273,6 +273,12 @@ message Source {
 message DataSource {
   // Required.
   // Unique source identifier.
+  // Supported formats for reading data from SDV CORE service units:
+  // - `FQIN|unit_name` to read from specific service_unit `unit_name` within a FQIN
+  // - `UnitType` to read from a service_unit for the given type `UnitType`
+  // - `UnitType|unit_name` to read from a service_unit `unit_name` for the given type `UnitType`
+  // - `pubsub:UnitType[topic_name]` to read from data tunnel publisher with topic `topic_name`
+  // - `rpc:UnitType[channel_name]` to read RPC server with channel `channel_name`
   string source_identifier = 1;
 
   // Defines connection behavior of Service Publisher.
