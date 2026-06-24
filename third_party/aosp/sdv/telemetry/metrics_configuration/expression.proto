@@ -165,6 +165,27 @@ message CombinationNode {
     CEIL = 2;
   }
 
+  // Operators for list types.
+  enum ListOperator {
+    // Binary operator.
+    // Output: an item of the list.
+    // Type requirements: left operand must be a list and right operand must be an integer.
+    // Examples (prefix notation):
+    // * `subscript [3, 1, 4, 1, 5] 0` returns 3
+    // * `subscript [3, 1, 4, 1, 5] 4` returns 5
+    // * `subscript [3, 1, 4, 1, 5] (-1)` returns 5 (the last item)
+    // * `subscript [3, 1, 4, 1, 5] (-3)` returns 4 (third last item)
+    SUBSCRIPT = 0;
+
+    // Unary operator.
+    // Output: integer
+    // Type requirements: the single operand must be a list
+    // Examples (prefix notation):
+    // * `length []` returns 0
+    // * `length [3, 1, 4, 1, 5]` returns 5
+    LENGTH = 1;
+  }
+
   // Required.
   // Index of the left child Node in the repeated list of `expression_nodes`
   // in MetricsConfig.
@@ -186,6 +207,7 @@ message CombinationNode {
     LogicalOperator logical_operator = 4;
     ArithmeticOperator arithmetic_operator = 5;
     RoundingOperator rounding_operator = 6;
+    ListOperator list_operator = 7;
   }
 }
 
