@@ -36,6 +36,8 @@ message Node {
     FieldLeafNode field_leaf_node = 3;
     // Leaf node that calls a function
     FunctionLeafNode function_leaf_node = 4;
+    // Message builder node that constructs a protobuf message in-place.
+    MessageBuilderNode message_builder_node = 5;
   }
 }
 
@@ -240,4 +242,24 @@ message GetCurrentTimestampFunction {
   }
 
   TimeSource time_source = 1;
+}
+
+// Message builder node that constructs a protobuf message in-place.
+message MessageBuilderNode {
+  // Required.
+  // Fully qualified name of the protobuf message that is created by the builder.
+  optional string message_type = 1;
+
+  // Required.
+  repeated FieldAssignment field_assignments = 2;
+
+  message FieldAssignment {
+    // Required.
+    // The name of the protobuf message field to set.
+    optional string field_name = 1;
+
+    // Required.
+    // The expression node index to use to set the field.
+    optional uint32 expression_node_index = 2;
+  }
 }
