@@ -196,13 +196,13 @@ cd backend && gcloud app deploy app.yaml
 
 ### 4. Access Deployed Services
 
-- **Main Flutter Web App**:  
+- **Main Flutter Web App**:
 
   ```
   https://YOUR_PROJECT_ID.appspot.com
   ```
 
-- **Backend APIs** (e.g., `scheduleSimulation`):  
+- **Backend APIs** (e.g., `scheduleSimulation`):
 
   ```
   https://backend-dot-YOUR_PROJECT_ID.appspot.com/api/scheduleSimulation
