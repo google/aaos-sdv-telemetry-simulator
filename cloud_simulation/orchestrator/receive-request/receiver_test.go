@@ -57,6 +57,45 @@ func EqAvroRecord(expected pubsub.AvroRecord) gomock.Matcher {
 	return avroRecordMatcher{expected: expected}
 }
 
+func successMocks(expectedBuildID string) func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+	return func(ms *mock_receiver.MockstorageClient, mf *mock_receiver.MockfirestoreClient, mp *mock_receiver.MockpubsubClient) {
+		expectedRecord := pubsub.AvroRecord{
+			Owner:             "test-owner",
+			FilePath:          "gs://test-bucket/valid/file/path",
+			BuildID:           expectedBuildID,
+			InstanceType:      "test-instancetype",
+			MaxSimulationTime: 60,
+			MaxReportCount:    5,
+		}
+		ms.EXPECT().Validate(gomock.Any(), gomock.Any()).Return(nil)
+		ms.EXPECT().CopyToOutputs(gomock.Any(), "gs://test-bucket/valid/file/path", gomock.Any())
+		mf.EXPECT().Write(gomock.Any(), EqAvroRecord(expectedRecord)).Return(nil)
+		mp.EXPECT().PublishMessage(gomock.Any(), "test-topic", EqAvroRecord(expectedRecord)).Return(nil)
+	}
+}
+
+func TestResolveAgentImage(t *testing.T) {
+	tests := []struct {
+		name, image, buildRef, want string
+	}{
+		{"bare tag", "test-image", "25Q2-latest", "test-image:25Q2-latest"},
+		{"leading colon tag", "test-image", ":25Q2-latest", "test-image:25Q2-latest"},
+		{"sha256 digest", "test-image", "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef", "test-image@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"},
+		{"@sha256 digest", "test-image", "@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef", "test-image@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"},
+		{"sha512 digest", "test-image", "sha512:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef", "test-image@sha512:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"},
+		{"full image URI", "test-image", "europe-west3-docker.pkg.dev/example-project/simulation/simulation-agent:25Q2-latest", "europe-west3-docker.pkg.dev/example-project/simulation/simulation-agent:25Q2-latest"},
+		{"registry port full URI", "test-image", "localhost:5000/repo/simulation-agent:custom-tag", "localhost:5000/repo/simulation-agent:custom-tag"},
+		{"empty buildRef", "test-image", "", ""},
+		{"whitespace buildRef", "test-image", "   ", ""},
+		{"empty agentDockerImage", "", "25Q2-latest", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, resolveAgentImage(tt.image, tt.buildRef))
+		})
+	}
+}
+
 func TestReceiveRequest(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -67,23 +106,8 @@ func TestReceiveRequest(t *testing.T) {
 		expectedError   string
 	}{
 		{
-			name: "Successful request",
-			setupMocks: func(ms *mock_receiver.MockstorageClient, mf *mock_receiver.MockfirestoreClient, mp *mock_receiver.MockpubsubClient) {
-				maxSimTime := 60
-				maxReportCount := 5
-				expectedRecord := pubsub.AvroRecord{
-					Owner:             "test-owner",
-					FilePath:          "gs://test-bucket/valid/file/path",
-					BuildID:           "test-image:test-build",
-					InstanceType:      "test-instancetype",
-					MaxSimulationTime: maxSimTime,
-					MaxReportCount:    maxReportCount,
-				}
-				ms.EXPECT().Validate(gomock.Any(), gomock.Any()).Return(nil)
-				ms.EXPECT().CopyToOutputs(gomock.Any(), "gs://test-bucket/valid/file/path", gomock.Any())
-				mf.EXPECT().Write(gomock.Any(), EqAvroRecord(expectedRecord)).Return(nil)
-				mp.EXPECT().PublishMessage(gomock.Any(), "test-topic", EqAvroRecord(expectedRecord)).Return(nil)
-			},
+			name:            "Successful request",
+			setupMocks:      successMocks("test-image:test-build"),
 			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
 			supportedBuilds: ``,
 			expectedStatus:  http.StatusOK,
@@ -101,15 +125,13 @@ func TestReceiveRequest(t *testing.T) {
 		{
 			name: "Firestore write fails",
 			setupMocks: func(ms *mock_receiver.MockstorageClient, mf *mock_receiver.MockfirestoreClient, mp *mock_receiver.MockpubsubClient) {
-				maxSimTime := 60
-				maxReportCount := 5
 				expectedRecord := pubsub.AvroRecord{
 					Owner:             "test-owner",
 					FilePath:          "gs://test-bucket/valid/file/path",
 					BuildID:           "test-image:test-build",
 					InstanceType:      "test-instancetype",
-					MaxSimulationTime: maxSimTime,
-					MaxReportCount:    maxReportCount,
+					MaxSimulationTime: 60,
+					MaxReportCount:    5,
 				}
 				ms.EXPECT().Validate(gomock.Any(), gomock.Any()).Return(nil)
 				mf.EXPECT().Write(gomock.Any(), EqAvroRecord(expectedRecord)).Return(errors.New("write failed"))
@@ -121,8 +143,7 @@ func TestReceiveRequest(t *testing.T) {
 		},
 		{
 			name: "Invalid JSON in message",
-			setupMocks: func(ms *mock_receiver.MockstorageClient, mf *mock_receiver.MockfirestoreClient, mp *mock_receiver.MockpubsubClient) {
-				// No expectations set as the function should return early
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
 			},
 			requestBody:     `invalid json`,
 			supportedBuilds: ``,
@@ -131,8 +152,7 @@ func TestReceiveRequest(t *testing.T) {
 		},
 		{
 			name: "Missing required fields",
-			setupMocks: func(ms *mock_receiver.MockstorageClient, mf *mock_receiver.MockfirestoreClient, mp *mock_receiver.MockpubsubClient) {
-				// No expectations set as the function should return early
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
 			},
 			requestBody:     `{}`,
 			supportedBuilds: ``,
@@ -141,43 +161,51 @@ func TestReceiveRequest(t *testing.T) {
 		},
 		{
 			name: "Unsupported build_id",
-			setupMocks: func(ms *mock_receiver.MockstorageClient, mf *mock_receiver.MockfirestoreClient, mp *mock_receiver.MockpubsubClient) {
-				// No client calls are expected as validation fails early.
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
 			},
 			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "unsupported-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
-			supportedBuilds: `{"supported-build":"sha256:abc", "another-build":"sha256:def"}`,
+			supportedBuilds: `{"supported-build":"25Q2-latest", "another-build":"main-nightly"}`,
 			expectedStatus:  http.StatusBadRequest,
 			expectedError:   `Unsupported build_id: "unsupported-build". Supported builds are: [another-build supported-build]`,
 		},
 		{
-			name: "Successful request with supported build_id",
-			setupMocks: func(ms *mock_receiver.MockstorageClient, mf *mock_receiver.MockfirestoreClient, mp *mock_receiver.MockpubsubClient) {
-				maxSimTime := 60
-				maxReportCount := 5
-				expectedRecord := pubsub.AvroRecord{
-					Owner:             "test-owner",
-					FilePath:          "gs://test-bucket/valid/file/path",
-					BuildID:           "test-image@sha256:abc",
-					InstanceType:      "test-instancetype",
-					MaxSimulationTime: maxSimTime,
-					MaxReportCount:    maxReportCount,
-				}
-				ms.EXPECT().Validate(gomock.Any(), gomock.Any()).Return(nil)
-				ms.EXPECT().CopyToOutputs(gomock.Any(), "gs://test-bucket/valid/file/path", gomock.Any())
-				mf.EXPECT().Write(gomock.Any(), EqAvroRecord(expectedRecord)).Return(nil)
-				mp.EXPECT().PublishMessage(gomock.Any(), "test-topic", EqAvroRecord(expectedRecord)).Return(nil)
-			},
+			name:            "Successful request with mapped release tag build_id",
+			setupMocks:      successMocks("test-image:25Q2-latest"),
 			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "supported-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
-			supportedBuilds: `{"supported-build":"sha256:abc"}`,
+			supportedBuilds: `{"supported-build":"25Q2-latest"}`,
 			expectedStatus:  http.StatusOK,
 		},
 		{
+			name:            "Successful request with passthrough sha256 digest when supported_builds is {}",
+			setupMocks:      successMocks("test-image@sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"),
+			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			supportedBuilds: `{}`,
+			expectedStatus:  http.StatusOK,
+		},
+		{
+			name: "Reject full image URI in passthrough mode when supported_builds is empty",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "evil-registry.com/bad-image:latest", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			supportedBuilds: ``,
+			expectedStatus:  http.StatusBadRequest,
+			expectedError:   "Full image URIs are not permitted when supported_agent_builds is empty",
+		},
+		{
 			name: "Invalid supported_builds JSON",
-			setupMocks: func(ms *mock_receiver.MockstorageClient, mf *mock_receiver.MockfirestoreClient, mp *mock_receiver.MockpubsubClient) {
-				// No client calls are expected as config parsing fails early.
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
 			},
 			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "any-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
 			supportedBuilds: `invalid-json`,
+			expectedStatus:  http.StatusInternalServerError,
+			expectedError:   "Internal server error: invalid build configuration",
+		},
+		{
+			name: "Empty supported_builds target value",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "empty-target", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			supportedBuilds: `{"empty-target":""}`,
 			expectedStatus:  http.StatusInternalServerError,
 			expectedError:   "Internal server error: invalid build configuration",
 		},

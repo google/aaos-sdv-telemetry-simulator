@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"simulator.code/receive-request/firestore"
@@ -102,6 +103,27 @@ func NewReceiver(fs firestoreClient, s storageClient, ps pubsub.Client, logger *
 	}
 }
 
+// resolveAgentImage formats a container image reference from agentDockerImage and buildRef:
+//   - registry/path[:tag|@digest] (contains "/") -> used verbatim
+//   - @sha256:... / :tag -> appended to agentDockerImage
+//   - sha256:... (contains ":") -> agentDockerImage@<digest>
+//   - anything else -> agentDockerImage:<tag>
+func resolveAgentImage(agentDockerImage, buildRef string) string {
+	if strings.TrimSpace(agentDockerImage) == "" || strings.TrimSpace(buildRef) == "" {
+		return ""
+	}
+	switch {
+	case strings.Contains(buildRef, "/"):
+		return buildRef
+	case strings.HasPrefix(buildRef, "@"), strings.HasPrefix(buildRef, ":"):
+		return agentDockerImage + buildRef
+	case strings.Contains(buildRef, ":"):
+		return agentDockerImage + "@" + buildRef
+	default:
+		return agentDockerImage + ":" + buildRef
+	}
+}
+
 func (r *receiver) ReceiveRequest(requestID string, w http.ResponseWriter, req *http.Request, topicID string, agentDockerImage string, simulationBucketPath string, supportedBuilds string) error {
 	ctx := req.Context()
 
@@ -125,31 +147,41 @@ func (r *receiver) ReceiveRequest(requestID string, w http.ResponseWriter, req *
 		return err
 	}
 
-	fullBuildID := agentDockerImage + ":" + reqData.BuildID
-
-	// Validate build_id against supported builds if provided
+	var fullBuildID string
+	var supported map[string]string
 	if supportedBuilds != "" && supportedBuilds != "{}" {
-		var supported map[string]string
 		if err := json.Unmarshal([]byte(supportedBuilds), &supported); err != nil {
 			r.logger.Error("Error parsing SUPPORTED_AGENT_BUILDS", "error", err)
 			http.Error(w, "Internal server error: invalid build configuration", http.StatusInternalServerError)
 			return fmt.Errorf("error parsing supported builds: %w", err)
 		}
+	}
 
-		if len(supported) > 0 {
-			if fingerprint, ok := supported[reqData.BuildID]; ok {
-				fullBuildID = agentDockerImage + "@" + fingerprint
-			} else {
-				keys := make([]string, 0, len(supported))
-				for k := range supported {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
-				errMsg := fmt.Sprintf("Unsupported build_id: %q. Supported builds are: %v", reqData.BuildID, keys)
-				http.Error(w, errMsg, http.StatusBadRequest)
-				return errors.New(errMsg)
+	if len(supported) > 0 {
+		target, ok := supported[reqData.BuildID]
+		if !ok {
+			keys := make([]string, 0, len(supported))
+			for k := range supported {
+				keys = append(keys, k)
 			}
+			sort.Strings(keys)
+			errMsg := fmt.Sprintf("Unsupported build_id: %q. Supported builds are: %v", reqData.BuildID, keys)
+			http.Error(w, errMsg, http.StatusBadRequest)
+			return errors.New(errMsg)
 		}
+		fullBuildID = resolveAgentImage(agentDockerImage, target)
+	} else {
+		if strings.Contains(reqData.BuildID, "/") {
+			errMsg := fmt.Sprintf("Invalid build_id: %q. Full image URIs are not permitted when supported_agent_builds is empty", reqData.BuildID)
+			http.Error(w, errMsg, http.StatusBadRequest)
+			return errors.New(errMsg)
+		}
+		fullBuildID = resolveAgentImage(agentDockerImage, reqData.BuildID)
+	}
+	if fullBuildID == "" {
+		r.logger.Error("Empty resolved agent image reference", "build_id", reqData.BuildID)
+		http.Error(w, "Internal server error: invalid build configuration", http.StatusInternalServerError)
+		return errors.New("empty resolved agent image reference")
 	}
 
 	record := pubsub.AvroRecord{

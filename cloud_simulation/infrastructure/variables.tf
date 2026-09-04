@@ -164,7 +164,11 @@ variable "simulation_reader_function_sa" {
 }
 
 variable "supported_agent_builds" {
-  description = "A map of supported agent build tags to their corresponding image fingerprints/digests. When not empty, the receive-request function will validate incoming requests against this list."
+  description = "A map of supported agent build aliases to their corresponding mutable image release tags (e.g. 25Q2-latest, main-nightly), image digests (sha256:...), or full container image URIs. When not empty, the receive-request function will validate incoming requests against this list."
   type        = map(string)
   default     = {}
+  validation {
+    condition     = alltrue([for v in values(var.supported_agent_builds) : trimspace(v) != ""])
+    error_message = "supported_agent_builds values must be non-empty tags, digests, or image URIs."
+  }
 }
