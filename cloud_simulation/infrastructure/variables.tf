@@ -25,7 +25,7 @@ variable "environment" {
   type        = string
   description = "Add envrionment name to use as postfix for resources. (Optional)"
   default     = ""
-
+  nullable    = false
 }
 
 variable "default_region" {

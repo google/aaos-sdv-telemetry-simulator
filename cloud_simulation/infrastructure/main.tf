@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+# Retain project-wide APIs when destroying ephemeral workspaces so shared project resources remain active.
 resource "google_project_service" "enable_services" {
   for_each = toset([
     "firestore.googleapis.com",
@@ -21,7 +22,8 @@ resource "google_project_service" "enable_services" {
     "eventarc.googleapis.com",
     "cloudscheduler.googleapis.com",
   ])
-  service = each.key
+  service            = each.key
+  disable_on_destroy = false
 }
 
 module "cloud_storage" {
