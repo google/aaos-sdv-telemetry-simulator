@@ -31,7 +31,7 @@ module "cloud_storage" {
   version = "9.0.1"
 
   project_id = var.project_id
-  names      = [local.sim_files_bucket]
+  names      = [local.names.sim_files_bucket]
   prefix     = var.project_id
   location   = var.location
 }
@@ -41,9 +41,11 @@ module "firestore" {
 
   project_id = var.project_id
   database = {
-    name        = local.database_name
-    type        = "FIRESTORE_NATIVE"
-    location_id = var.location_id
+    name                    = local.database_name
+    type                    = "FIRESTORE_NATIVE"
+    location_id             = var.location_id
+    deletion_policy         = terraform.workspace == "default" ? null : "DELETE"
+    delete_protection_state = terraform.workspace == "default" ? null : "DELETE_PROTECTION_DISABLED"
   }
   indexes = local.firestore_indexes
 }
@@ -123,33 +125,78 @@ module "cloud_storage_function_code" {
   version = "9.0.1"
 
   project_id = var.project_id
-  names      = ["simulation_functions_code${var.environment == "" ? "" : "-${var.environment}"}"]
+  names      = [local.names.fn_code_bucket]
   prefix     = var.project_id
   location   = var.location
 }
 
-
+check "environment_matches_workspace" {
+  assert {
+    condition     = terraform.workspace == "default" || var.environment == "" || var.environment == terraform.workspace
+    error_message = "var.environment must be empty or equal to the workspace name in non-default workspaces."
+  }
+}
 
 locals {
+  env_name   = terraform.workspace != "default" ? terraform.workspace : var.environment
+  env_suffix = local.env_name == "" ? "" : "-${trim(lower(replace(local.env_name, "_", "-")), "-")}"
+
+  # key => { base name, max length imposed by the GCP API }
+  name_specs = merge({
+    database          = { base = "${var.project_id}-simulator", max = 63 }
+    fn_code_bucket    = { base = "simulation_functions_code", max = 62 - length(var.project_id) }
+    sim_files_bucket  = { base = "simulation_files", max = 62 - length(var.project_id) }
+    receive_fn        = { base = "simulation-orchestrator-receive-requests", max = 63 }
+    delete_fn         = { base = "simulation-orchestrator-delete-simulation", max = 63 }
+    finisher_fn       = { base = "simulation-orchestrator-finish-simulation", max = 63 }
+    reader_fn         = { base = "simulation-reader", max = 63 }
+    scheduler_fn      = { base = "simulation-scheduler", max = 63 }
+    pubsub_trigger    = { base = "scheduler-pubsub-trigger", max = 63 }
+    firestore_trigger = { base = "scheduler-firestore-trigger-${var.default_region}", max = 63 }
+    cleanup_job       = { base = "simulation-instance-cleanup-scheduler", max = 63 }
+    # service accounts, account_id limit is 30
+    scheduler_trigger_sa          = { base = "scheduler-trigger", max = 30 }
+    simulation_agent_sa           = { base = "simulation-agent", max = 30 }
+    simulation_finisher_sa        = { base = "simulation-finisher-function", max = 30 }
+    scheduler_function_sa         = { base = "scheduler-function", max = 30 }
+    receive_request_function_sa   = { base = "receive-request-function", max = 30 }
+    delete_simulation_function_sa = { base = "delete-simulation-function", max = 30 }
+    cleanup_scheduler_sa          = { base = "cleanup-scheduler", max = 30 }
+    simulation_reader_function_sa = { base = "simulation-reader", max = 30 }
+    }, var.vpc_connector == null || !var.vpc_connector.create ? {} : {
+    vpc_connector = { base = var.vpc_connector.name, max = 25 }
+  })
+
+  full_names = { for k, s in local.name_specs : k => "${s.base}${local.env_suffix}" }
+
+  # Names that fit are used verbatim; longer ones are truncated and get an 8-char
+  # sha256 of the full name appended so distinct workspaces cannot collide.
+  names = {
+    for k, s in local.name_specs : k => (
+      length(local.full_names[k]) <= s.max
+      ? local.full_names[k]
+      : "${trim(substr(local.full_names[k], 0, s.max - 9), "-")}-${substr(sha256(local.full_names[k]), 0, 8)}"
+    )
+  }
+
   # Static resource identifiers knowable during planning to avoid provider plan drift
-  database_name     = "${var.project_id}-simulator${var.environment == "" ? "" : "-${var.environment}"}"
-  subscription_name = "simulation-requests${var.environment == "" ? "" : "-${var.environment}"}"
-  topic_name        = "simulation-queue${var.environment == "" ? "" : "-${var.environment}"}"
-  sim_files_bucket  = "simulation_files${var.environment == "" ? "" : "-${var.environment}"}"
-  bucket_name       = "${var.project_id}-${local.sim_files_bucket}"
-  finisher_fn_name  = "simulation-orchestrator-finish-simulation${var.environment == "" ? "" : "-${var.environment}"}"
+  database_name     = local.names.database
+  subscription_name = "simulation-requests${local.env_suffix}"
+  topic_name        = "simulation-queue${local.env_suffix}"
+  bucket_name       = "${var.project_id}-${local.names.sim_files_bucket}"
+
   # Use the deterministic cloudfunctions.net URL instead of module.simulation_finisher_function.uri
   # (which resolves to a random *.a.run.app URL only after apply). The simulation agent mints an OIDC
   # token with FINISH_FUNCTION_URL as the audience and POSTs to it directly; Cloud Functions v2
   # automatically registers its cloudfunctions.net URL as a custom audience on the Cloud Run service.
   # Note: Standard non-domain-scoped GCP project IDs (validated in variables.tf) are required across
   # this module (including GCS bucket and Firestore database naming).
-  finisher_fn_url = "https://${var.default_region}-${var.project_id}.cloudfunctions.net/${local.finisher_fn_name}"
+  finisher_fn_url = "https://${var.default_region}-${var.project_id}.cloudfunctions.net/${local.names.finisher_fn}"
 }
 
 resource "google_vpc_access_connector" "connector" {
   count          = try(var.vpc_connector.create, false) == true ? 1 : 0
-  name           = "${var.vpc_connector.name}${var.environment == "" ? "" : "-${var.environment}"}"
+  name           = try(local.names.vpc_connector, null)
   ip_cidr_range  = var.vpc_connector_config.ip_cidr_range
   network        = var.vpc_connector_config.network
   max_instances  = try(var.vpc_connector_config.instances.max, null)
@@ -162,7 +209,7 @@ module "simulation_orchestrator_function" {
   source           = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/cloud-function-v2?ref=v37.1.0&depth=1"
   project_id       = var.project_id
   region           = var.default_region
-  name             = "simulation-orchestrator-receive-requests${var.environment == "" ? "" : "-${var.environment}"}"
+  name             = local.names.receive_fn
   bucket_name      = module.cloud_storage_function_code.name
   service_account  = var.receive_request_function_sa != null ? var.receive_request_function_sa : module.receive_request_function_sa[0].email
   ingress_settings = var.ingress_settings
@@ -178,7 +225,7 @@ module "simulation_orchestrator_function" {
   bundle_config = {
     path = "../orchestrator/receive-request/"
     folder_options = {
-      excludes     = ["*_test.go"]
+      excludes = ["*_test.go"]
     }
   }
 
@@ -203,7 +250,7 @@ module "simulation_deletion_function" {
   source           = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/cloud-function-v2?ref=v37.1.0&depth=1"
   project_id       = var.project_id
   region           = var.default_region
-  name             = "simulation-orchestrator-delete-simulation${var.environment == "" ? "" : "-${var.environment}"}"
+  name             = local.names.delete_fn
   bucket_name      = module.cloud_storage_function_code.name
   service_account  = var.delete_simulation_function_sa != null ? var.delete_simulation_function_sa : module.delete_simulation_function_sa[0].email
   ingress_settings = var.ingress_settings
@@ -219,7 +266,7 @@ module "simulation_deletion_function" {
   bundle_config = {
     path = "../orchestrator/delete-simulation/"
     folder_options = {
-      excludes     = ["*_test.go"]
+      excludes = ["*_test.go"]
     }
   }
 
@@ -241,7 +288,7 @@ module "simulation_finisher_function" {
   source           = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/cloud-function-v2?ref=v37.1.0&depth=1"
   project_id       = var.project_id
   region           = var.default_region
-  name             = local.finisher_fn_name
+  name             = local.names.finisher_fn
   bucket_name      = module.cloud_storage_function_code.name
   service_account  = var.simulation_finisher_sa != null ? var.simulation_finisher_sa : module.simulation_finisher_sa[0].email
   ingress_settings = var.ingress_settings
@@ -257,7 +304,7 @@ module "simulation_finisher_function" {
   bundle_config = {
     path = "../orchestrator/finish-simulation/"
     folder_options = {
-      excludes     = ["*_test.go"]
+      excludes = ["*_test.go"]
     }
   }
 
@@ -279,7 +326,7 @@ module "simulation_reader_function" {
   source           = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/cloud-function-v2?ref=v37.1.0&depth=1"
   project_id       = var.project_id
   region           = var.default_region
-  name             = "simulation-reader${var.environment == "" ? "" : "-${var.environment}"}"
+  name             = local.names.reader_fn
   bucket_name      = module.cloud_storage_function_code.name
   service_account  = var.simulation_reader_function_sa != null ? var.simulation_reader_function_sa : module.simulation_reader_function_sa[0].email
   ingress_settings = var.ingress_settings
@@ -295,7 +342,7 @@ module "simulation_reader_function" {
   bundle_config = {
     path = "../orchestrator/read-simulation/"
     folder_options = {
-      excludes     = ["*_test.go"]
+      excludes = ["*_test.go"]
     }
   }
 
@@ -317,7 +364,7 @@ data "google_compute_subnetwork" "simulation_instances" {
 }
 
 resource "google_eventarc_trigger" "pubsub_trigger" {
-  name            = "scheduler-pubsub-trigger${var.environment == "" ? "" : "-${var.environment}"}"
+  name            = local.names.pubsub_trigger
   location        = "us-central1" // serverless region
   project         = var.project_id
   service_account = var.scheduler_trigger_sa != null ? var.scheduler_trigger_sa : module.scheduler_trigger_sa[0].email
@@ -344,7 +391,7 @@ resource "google_eventarc_trigger" "pubsub_trigger" {
 
 
 resource "google_eventarc_trigger" "firestore_trigger" {
-  name                    = "scheduler-firestore-trigger-${var.default_region}${var.environment == "" ? "" : "-${var.environment}"}"
+  name                    = local.names.firestore_trigger
   location                = var.location_id
   project                 = var.project_id
   service_account         = var.scheduler_trigger_sa != null ? var.scheduler_trigger_sa : module.scheduler_trigger_sa[0].email
@@ -378,7 +425,7 @@ module "scheduler_function" {
   source           = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/cloud-function-v2?ref=v37.1.0&depth=1"
   project_id       = var.project_id
   region           = var.default_region
-  name             = "simulation-scheduler${var.environment == "" ? "" : "-${var.environment}"}"
+  name             = local.names.scheduler_fn
   bucket_name      = module.cloud_storage_function_code.name
   service_account  = var.scheduler_function_sa != null ? var.scheduler_function_sa : module.scheduler_function_sa[0].email
   ingress_settings = "ALLOW_INTERNAL_ONLY" //var.ingress_settings
@@ -395,7 +442,7 @@ module "scheduler_function" {
   bundle_config = {
     path = "../orchestrator/schedule-simulation/"
     folder_options = {
-      excludes     = ["*_test.go"]
+      excludes = ["*_test.go"]
     }
   }
 
@@ -405,13 +452,16 @@ module "scheduler_function" {
   }
 
   environment_variables = {
-    GCP_PROJECT             = var.project_id
-    REGISTRY_REGION         = var.registry_region != null ? var.registry_region : var.default_region
-    FIRESTORE_DATABASE      = local.database_name
-    COMPUTE_ZONE            = var.default_zone
-    PUBSUB_SUBSCRIPTION     = local.subscription_name
+    GCP_PROJECT         = var.project_id
+    REGISTRY_REGION     = var.registry_region != null ? var.registry_region : var.default_region
+    FIRESTORE_DATABASE  = local.database_name
+    COMPUTE_ZONE        = var.default_zone
+    PUBSUB_SUBSCRIPTION = local.subscription_name
+    # Construct the email statically from local.names.simulation_agent_sa rather than
+    # module.simulation_agent_sa[0].email, which is unknown at plan time on initial creation
+    # and triggers the google_cloudfunctions2_function environment_variables plan drift bug.
     # Standard non-domain-scoped GCP project IDs are enforced in variables.tf.
-    VM_SERVICEACCOUNT       = var.simulation_agent_sa != null ? var.simulation_agent_sa : "simulation-agent${var.environment == "" ? "" : "-${var.environment}"}@${var.project_id}.iam.gserviceaccount.com"
+    VM_SERVICEACCOUNT       = var.simulation_agent_sa != null ? var.simulation_agent_sa : "${local.names.simulation_agent_sa}@${var.project_id}.iam.gserviceaccount.com"
     MAX_SIMULATION_DURATION = "14400"
     SUBNET                  = data.google_compute_subnetwork.simulation_instances.id
     DISK_SIZE               = "70"
@@ -425,7 +475,7 @@ module "scheduler_function" {
 }
 
 resource "google_cloud_scheduler_job" "simulator_instances_cleanup_scheduler" {
-  name      = "simulation-instance-cleanup-scheduler${var.environment == "" ? "" : "-${var.environment}"}"
+  name      = local.names.cleanup_job
   schedule  = "0 8 * * *" # Runs every day at 8 AM
   time_zone = "Etc/UTC"
 

@@ -23,9 +23,13 @@ variable "project_id" {
 
 variable "environment" {
   type        = string
-  description = "Add envrionment name to use as postfix for resources. (Optional)"
+  description = "Environment name used as a resource suffix in the default workspace. Ignored in non-default Terraform workspaces, where terraform.workspace is used instead and this variable must be empty or match the workspace name. Use Terraform workspaces for ephemeral review deployments and this variable for long-lived environments. (Optional)"
   default     = ""
   nullable    = false
+  validation {
+    condition     = can(regex("^[a-z0-9-]*$", var.environment))
+    error_message = "environment must contain only lowercase alphanumeric characters and hyphens."
+  }
 }
 
 variable "default_region" {

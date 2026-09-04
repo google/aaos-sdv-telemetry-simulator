@@ -19,7 +19,7 @@ module "scheduler_trigger_sa" {
   count      = var.scheduler_trigger_sa == null ? 1 : 0
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/iam-service-account?ref=v37.1.0&depth=1"
   project_id = var.project_id
-  name       = "scheduler-trigger${var.environment == "" ? "" : "-${var.environment}"}"
+  name       = local.names.scheduler_trigger_sa
   iam_project_roles = {
     "${var.project_id}" = [
       "roles/eventarc.eventReceiver",
@@ -32,7 +32,7 @@ module "simulation_agent_sa" {
   count      = var.simulation_agent_sa == null ? 1 : 0
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/iam-service-account?ref=v37.1.0&depth=1"
   project_id = var.project_id
-  name       = "simulation-agent${var.environment == "" ? "" : "-${var.environment}"}"
+  name       = local.names.simulation_agent_sa
   iam_project_roles = {
     "${var.project_id}" = [
       "roles/run.invoker",
@@ -45,7 +45,7 @@ module "simulation_finisher_sa" {
   count      = var.simulation_finisher_sa == null ? 1 : 0
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/iam-service-account?ref=v37.1.0&depth=1"
   project_id = var.project_id
-  name       = "simulation-finisher-function${var.environment == "" ? "" : "-${var.environment}"}"
+  name       = local.names.simulation_finisher_sa
   iam_project_roles = {
     "${var.project_id}" = [
       "roles/datastore.user",
@@ -58,7 +58,7 @@ module "scheduler_function_sa" {
   count      = var.scheduler_function_sa == null ? 1 : 0
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/iam-service-account?ref=v37.1.0&depth=1"
   project_id = var.project_id
-  name       = "scheduler-function${var.environment == "" ? "" : "-${var.environment}"}"
+  name       = local.names.scheduler_function_sa
   iam_project_roles = {
     "${var.project_id}" = [
       "roles/datastore.user",
@@ -73,7 +73,7 @@ module "receive_request_function_sa" {
   count      = var.receive_request_function_sa == null ? 1 : 0
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/iam-service-account?ref=v37.1.0&depth=1"
   project_id = var.project_id
-  name       = "receive-request-function${var.environment == "" ? "" : "-${var.environment}"}"
+  name       = local.names.receive_request_function_sa
   iam_project_roles = {
     "${var.project_id}" = [
       "roles/datastore.user",
@@ -86,7 +86,7 @@ module "delete_simulation_function_sa" {
   count      = var.delete_simulation_function_sa == null ? 1 : 0
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/iam-service-account?ref=v37.1.0&depth=1"
   project_id = var.project_id
-  name       = "delete-simulation-function${var.environment == "" ? "" : "-${var.environment}"}"
+  name       = local.names.delete_simulation_function_sa
   iam_project_roles = {
     "${var.project_id}" = [
       "roles/datastore.user",
@@ -100,7 +100,7 @@ module "cleanup_scheduler_sa" {
   count      = var.cleanup_scheduler_sa == null ? 1 : 0
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/iam-service-account?ref=v37.1.0&depth=1"
   project_id = var.project_id
-  name       = "cleanup-scheduler${var.environment == "" ? "" : "-${var.environment}"}"
+  name       = local.names.cleanup_scheduler_sa
   iam_project_roles = {
     "${var.project_id}" = [
       "roles/iam.serviceAccountUser",
@@ -113,7 +113,7 @@ module "simulation_reader_function_sa" {
   count      = var.simulation_reader_function_sa == null ? 1 : 0
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/iam-service-account?ref=v37.1.0&depth=1"
   project_id = var.project_id
-  name       = "simulation-reader${var.environment == "" ? "" : "-${var.environment}"}"
+  name       = local.names.simulation_reader_function_sa
   iam_project_roles = {
     "${var.project_id}" = [
       "roles/datastore.user",
