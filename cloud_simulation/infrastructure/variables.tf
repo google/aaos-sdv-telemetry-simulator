@@ -13,7 +13,12 @@
 // limitations under the License.
 
 variable "project_id" {
-  type = string
+  type        = string
+  description = "Standard GCP project ID (6-30 lowercase letters, digits, or hyphens; legacy domain-scoped project IDs containing colons are not supported)."
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{4,28}[a-z0-9]$", var.project_id))
+    error_message = "project_id must be a valid 6-30 character GCP project ID without a legacy domain prefix (no colons)."
+  }
 }
 
 variable "environment" {

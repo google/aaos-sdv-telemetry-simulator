@@ -29,7 +29,7 @@ module "cloud_storage" {
   version = "9.0.1"
 
   project_id = var.project_id
-  names      = ["simulation_files${var.environment == "" ? "" : "-${var.environment}"}"]
+  names      = [local.sim_files_bucket]
   prefix     = var.project_id
   location   = var.location
 }
@@ -39,7 +39,7 @@ module "firestore" {
 
   project_id = var.project_id
   database = {
-    name        = "${var.project_id}-simulator${var.environment == "" ? "" : "-${var.environment}"}"
+    name        = local.database_name
     type        = "FIRESTORE_NATIVE"
     location_id = var.location_id
   }
@@ -66,7 +66,7 @@ resource "google_firestore_document" "vm_instance_counter" {
 module "simulation_queue" {
   source     = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/pubsub?ref=v37.1.0&depth=1"
   project_id = var.project_id
-  name       = "simulation-queue${var.environment == "" ? "" : "-${var.environment}"}"
+  name       = local.topic_name
   schema = {
     msg_encoding = "JSON"
     schema_type  = "AVRO"
@@ -107,7 +107,7 @@ module "simulation_queue" {
   }
 
   subscriptions = {
-    "simulation-requests${var.environment == "" ? "" : "-${var.environment}"}" = {
+    (local.subscription_name) = {
       ack_deadline_seconds         = 600
       enable_exactly_once_delivery = true
       enable_message_ordering      = true
@@ -129,8 +129,20 @@ module "cloud_storage_function_code" {
 
 
 locals {
-  database_id   = split("/", trimsuffix(module.firestore.firestore_database.id, "/"))
-  database_name = tostring(element(local.database_id, length(local.database_id) - 1))
+  # Static resource identifiers knowable during planning to avoid provider plan drift
+  database_name     = "${var.project_id}-simulator${var.environment == "" ? "" : "-${var.environment}"}"
+  subscription_name = "simulation-requests${var.environment == "" ? "" : "-${var.environment}"}"
+  topic_name        = "simulation-queue${var.environment == "" ? "" : "-${var.environment}"}"
+  sim_files_bucket  = "simulation_files${var.environment == "" ? "" : "-${var.environment}"}"
+  bucket_name       = "${var.project_id}-${local.sim_files_bucket}"
+  finisher_fn_name  = "simulation-orchestrator-finish-simulation${var.environment == "" ? "" : "-${var.environment}"}"
+  # Use the deterministic cloudfunctions.net URL instead of module.simulation_finisher_function.uri
+  # (which resolves to a random *.a.run.app URL only after apply). The simulation agent mints an OIDC
+  # token with FINISH_FUNCTION_URL as the audience and POSTs to it directly; Cloud Functions v2
+  # automatically registers its cloudfunctions.net URL as a custom audience on the Cloud Run service.
+  # Note: Standard non-domain-scoped GCP project IDs (validated in variables.tf) are required across
+  # this module (including GCS bucket and Firestore database naming).
+  finisher_fn_url = "https://${var.default_region}-${var.project_id}.cloudfunctions.net/${local.finisher_fn_name}"
 }
 
 resource "google_vpc_access_connector" "connector" {
@@ -176,8 +188,8 @@ module "simulation_orchestrator_function" {
   environment_variables = {
     GCP_PROJECT            = var.project_id
     FIRESTORE_DATABASE     = local.database_name
-    PUBSUB_TOPIC_ID        = element(split("/", module.simulation_queue.topic.id), length(split("/", module.simulation_queue.topic.id)) - 1)
-    SIMULATION_BUCKET      = var.input_files_bucket != null ? var.input_files_bucket : "gs://${module.cloud_storage.name}"
+    PUBSUB_TOPIC_ID        = local.topic_name
+    SIMULATION_BUCKET      = var.input_files_bucket != null ? var.input_files_bucket : "gs://${local.bucket_name}"
     AGENT_DOCKER_IMAGE     = var.agent_docker_image
     SUPPORTED_AGENT_BUILDS = jsonencode(var.supported_agent_builds)
   }
@@ -227,7 +239,7 @@ module "simulation_finisher_function" {
   source           = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/cloud-function-v2?ref=v37.1.0&depth=1"
   project_id       = var.project_id
   region           = var.default_region
-  name             = "simulation-orchestrator-finish-simulation${var.environment == "" ? "" : "-${var.environment}"}"
+  name             = local.finisher_fn_name
   bucket_name      = module.cloud_storage_function_code.name
   service_account  = var.simulation_finisher_sa != null ? var.simulation_finisher_sa : module.simulation_finisher_sa[0].email
   ingress_settings = var.ingress_settings
@@ -293,18 +305,13 @@ module "simulation_reader_function" {
   environment_variables = {
     GCP_PROJECT        = var.project_id
     FIRESTORE_DATABASE = local.database_name
-    MAX_VM_COUNT       = var.max_vm_count
+    MAX_VM_COUNT       = tostring(var.max_vm_count)
   }
 }
 
 data "google_compute_subnetwork" "simulation_instances" {
   name   = var.subnet_name
   region = var.default_region
-}
-
-locals {
-  subscription_id   = split("/", trimsuffix(module.simulation_queue.subscription_id["simulation-requests${var.environment == "" ? "" : "-${var.environment}"}"], "/"))
-  subscription_name = tostring(element(local.subscription_id, length(local.subscription_id) - 1))
 }
 
 resource "google_eventarc_trigger" "pubsub_trigger" {
@@ -401,14 +408,15 @@ module "scheduler_function" {
     FIRESTORE_DATABASE      = local.database_name
     COMPUTE_ZONE            = var.default_zone
     PUBSUB_SUBSCRIPTION     = local.subscription_name
-    VM_SERVICEACCOUNT       = var.simulation_agent_sa != null ? var.simulation_agent_sa : module.simulation_agent_sa[0].email
-    MAX_SIMULATION_DURATION = 4 * 60 * 60 //4 hrs to sec
+    # Standard non-domain-scoped GCP project IDs are enforced in variables.tf.
+    VM_SERVICEACCOUNT       = var.simulation_agent_sa != null ? var.simulation_agent_sa : "simulation-agent${var.environment == "" ? "" : "-${var.environment}"}@${var.project_id}.iam.gserviceaccount.com"
+    MAX_SIMULATION_DURATION = "14400"
     SUBNET                  = data.google_compute_subnetwork.simulation_instances.id
     DISK_SIZE               = "70"
-    MAX_VM_COUNT            = var.max_vm_count
+    MAX_VM_COUNT            = tostring(var.max_vm_count)
     VM_IMAGE                = var.vm_image
-    SIMULATION_BUCKET       = module.cloud_storage.name
-    FINISH_FUNCTION_URL     = module.simulation_finisher_function.uri
+    SIMULATION_BUCKET       = local.bucket_name
+    FINISH_FUNCTION_URL     = local.finisher_fn_url
   }
 
   depends_on = [module.firestore]
