@@ -94,7 +94,6 @@ func TestResolveDatabaseID(t *testing.T) {
 		})
 	}
 }
-
 func TestResolveBucketName(t *testing.T) {
 	tests := []struct {
 		name string
@@ -149,6 +148,36 @@ func TestResolveReceiveFunctionName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := resolveReceiveFunctionName(tt.cfg); got != tt.want {
 				t.Errorf("resolveReceiveFunctionName(%+v) = %q, want %q", tt.cfg, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveTokenAudience(t *testing.T) {
+	tests := []struct {
+		name        string
+		webClientID string
+		serviceURL  string
+		want        string
+	}{
+		{
+			name:        "uses webClientID when provided",
+			webClientID: "custom-client-id.apps.googleusercontent.com",
+			serviceURL:  "https://europe-west3-example.cloudfunctions.net/receive",
+			want:        "custom-client-id.apps.googleusercontent.com",
+		},
+		{
+			name:        "falls back to serviceURL when webClientID is empty",
+			webClientID: "",
+			serviceURL:  "https://europe-west3-example.cloudfunctions.net/receive",
+			want:        "https://europe-west3-example.cloudfunctions.net/receive",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolveTokenAudience(tt.webClientID, tt.serviceURL); got != tt.want {
+				t.Errorf("resolveTokenAudience(%q, %q) = %q, want %q", tt.webClientID, tt.serviceURL, got, tt.want)
 			}
 		})
 	}

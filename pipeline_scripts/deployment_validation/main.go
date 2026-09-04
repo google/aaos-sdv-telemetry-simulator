@@ -70,7 +70,7 @@ type config struct {
 func defineFlags(cfg *config) {
 	flag.StringVar(&cfg.projectID, "project-id", "", "GCP Project ID where the simulation infrastructure is deployed.")
 	flag.StringVar(&cfg.region, "region", defaultRegion, "Region for the Cloud Function.")
-	flag.StringVar(&cfg.serviceURL, "service-url", "", "Override the Cloud Function URL. Useful for local/proxy testing.")
+	flag.StringVar(&cfg.serviceURL, "service-url", "", "Override the Cloud Function URL (if empty, looked up via Cloud Functions API; also used as default OIDC token audience unless --web-client-id or --auth-token is set).")
 	flag.StringVar(&cfg.webClientID, "web-client-id", "", "Add a web client id for token audience, if required.")
 	flag.StringVar(&cfg.environment, "environment", defaultEnvironment, "Convenience environment suffix for manual runs when --service-url, --database-id, or --bucket-name are not explicitly provided.")
 	flag.StringVar(&cfg.databaseID, "database-id", "", "Override the Firestore database ID (pass from terraform output in CI; defaults to <project-id>-simulator[-<environment>]).")
@@ -137,14 +137,11 @@ func run(cfg config) error {
 	authToken := cfg.authToken
 	if authToken == "" {
 		log.Println("🔧 No --auth-token provided, generating a new identity token...")
-		authToken, err = getIdentityToken(ctx, cfg.webClientID)
+		audience := resolveTokenAudience(cfg.webClientID, serviceURL)
+		authToken, err = getIdentityToken(ctx, audience)
 		if err != nil {
 			return fmt.Errorf("failed to get identity token: %w", err)
 		}
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to get access token: %w", err)
 	}
 
 	// --- Upload Test Files if local directory is specified ---
@@ -261,6 +258,13 @@ func getCloudFunctionURL(ctx context.Context, cfg config) (string, error) {
 	}
 
 	return serviceConfig.GetUri(), nil
+}
+
+func resolveTokenAudience(webClientID, serviceURL string) string {
+	if webClientID != "" {
+		return webClientID
+	}
+	return serviceURL
 }
 
 func getIdentityToken(ctx context.Context, audience string) (string, error) {
