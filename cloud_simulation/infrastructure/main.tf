@@ -192,10 +192,24 @@ locals {
   # Note: Standard non-domain-scoped GCP project IDs (validated in variables.tf) are required across
   # this module (including GCS bucket and Firestore database naming).
   finisher_fn_url = "https://${var.default_region}-${var.project_id}.cloudfunctions.net/${local.names.finisher_fn}"
+
+  vpc_connector_id = (
+    var.vpc_connector == null
+    ? null
+    : (
+      var.vpc_connector.create
+      ? google_vpc_access_connector.connector[0].id
+      : (
+        startswith(var.vpc_connector.name, "projects/")
+        ? var.vpc_connector.name
+        : "projects/${var.project_id}/locations/${var.default_region}/connectors/${var.vpc_connector.name}"
+      )
+    )
+  )
 }
 
 resource "google_vpc_access_connector" "connector" {
-  count          = try(var.vpc_connector.create, false) == true ? 1 : 0
+  count          = var.vpc_connector != null && var.vpc_connector.create ? 1 : 0
   name           = try(local.names.vpc_connector, null)
   ip_cidr_range  = var.vpc_connector_config.ip_cidr_range
   network        = var.vpc_connector_config.network
@@ -203,6 +217,13 @@ resource "google_vpc_access_connector" "connector" {
   min_instances  = try(var.vpc_connector_config.instances.min, null)
   max_throughput = try(var.vpc_connector_config.throughput.max, null)
   min_throughput = try(var.vpc_connector_config.throughput.min, null)
+
+  lifecycle {
+    precondition {
+      condition     = terraform.workspace == "default"
+      error_message = "Ephemeral workspaces must reuse a shared VPC connector: set vpc_connector.create = false and pass the full connector resource name."
+    }
+  }
 }
 
 module "simulation_orchestrator_function" {
@@ -218,7 +239,7 @@ module "simulation_orchestrator_function" {
     ? null
     : {
       create          = false
-      name            = try(var.vpc_connector.create, false) == false ? var.vpc_connector.name : google_vpc_access_connector.connector[0].id
+      name            = local.vpc_connector_id
       egress_settings = var.vpc_connector.egress_settings
     }
   )
@@ -259,7 +280,7 @@ module "simulation_deletion_function" {
     ? null
     : {
       create          = false
-      name            = try(var.vpc_connector.create, false) == false ? var.vpc_connector.name : google_vpc_access_connector.connector[0].id
+      name            = local.vpc_connector_id
       egress_settings = var.vpc_connector.egress_settings
     }
   )
@@ -297,7 +318,7 @@ module "simulation_finisher_function" {
     ? null
     : {
       create          = false
-      name            = try(var.vpc_connector.create, false) == false ? var.vpc_connector.name : google_vpc_access_connector.connector[0].id
+      name            = local.vpc_connector_id
       egress_settings = var.vpc_connector.egress_settings
     }
   )
@@ -335,7 +356,7 @@ module "simulation_reader_function" {
     ? null
     : {
       create          = false
-      name            = try(var.vpc_connector.create, false) == false ? var.vpc_connector.name : google_vpc_access_connector.connector[0].id
+      name            = local.vpc_connector_id
       egress_settings = var.vpc_connector.egress_settings
     }
   )
@@ -434,7 +455,7 @@ module "scheduler_function" {
     ? null
     : {
       create          = false
-      name            = try(var.vpc_connector.create, false) == false ? var.vpc_connector.name : google_vpc_access_connector.connector[0].id
+      name            = local.vpc_connector_id
       egress_settings = var.vpc_connector.egress_settings
     }
   )

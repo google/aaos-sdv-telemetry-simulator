@@ -14,7 +14,7 @@
 
 output "vpc_access_connector" {
   description = "The ID of the VPC Access Connector used."
-  value       = google_vpc_access_connector.connector[0].id
+  value       = local.vpc_connector_id
 }
 
 output "receive_request_function_url" {
