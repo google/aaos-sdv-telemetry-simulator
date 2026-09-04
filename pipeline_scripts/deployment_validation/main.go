@@ -56,6 +56,8 @@ type config struct {
 	serviceURL        string
 	webClientID       string
 	environment       string
+	databaseID        string
+	bucketName        string
 	authToken         string
 	buildID           string
 	instanceType      string
@@ -70,7 +72,9 @@ func defineFlags(cfg *config) {
 	flag.StringVar(&cfg.region, "region", defaultRegion, "Region for the Cloud Function.")
 	flag.StringVar(&cfg.serviceURL, "service-url", "", "Override the Cloud Function URL. Useful for local/proxy testing.")
 	flag.StringVar(&cfg.webClientID, "web-client-id", "", "Add a web client id for token audience, if required.")
-	flag.StringVar(&cfg.environment, "environment", defaultEnvironment, "The environment stack used to execute the simulation.")
+	flag.StringVar(&cfg.environment, "environment", defaultEnvironment, "Convenience environment suffix for manual runs when --service-url, --database-id, or --bucket-name are not explicitly provided.")
+	flag.StringVar(&cfg.databaseID, "database-id", "", "Override the Firestore database ID (pass from terraform output in CI; defaults to <project-id>-simulator[-<environment>]).")
+	flag.StringVar(&cfg.bucketName, "bucket-name", "", "Override the simulation files GCS bucket name (pass from terraform output in CI; defaults to <project-id>-simulation_files[-<environment>]).")
 	flag.StringVar(&cfg.authToken, "auth-token", "", "Bearer token for authorization. Defaults to gcloud identity-token.")
 	flag.StringVar(&cfg.buildID, "build-id", defaultBuildID, "The agent build ID/tag to test.")
 	flag.StringVar(&cfg.instanceType, "instance-type", defaultInstanceType, "GCE instance type for the simulation.")
@@ -193,7 +197,7 @@ func uploadTestFiles(ctx context.Context, cfg config) error {
 	}
 	defer storageClient.Close()
 
-	bucketName := fmt.Sprintf("%s-simulation_files-%s", cfg.projectID, cfg.environment)
+	bucketName := resolveBucketName(cfg)
 	bkt := storageClient.Bucket(bucketName)
 
 	// Check if the local directory exists
@@ -242,7 +246,7 @@ func getCloudFunctionURL(ctx context.Context, cfg config) (string, error) {
 	}
 	defer functionsClient.Close()
 
-	functionName := fmt.Sprintf("simulation-orchestrator-receive-requests-%s", cfg.environment)
+	functionName := resolveReceiveFunctionName(cfg)
 	req := &functionspb.GetFunctionRequest{
 		Name: fmt.Sprintf("projects/%s/locations/%s/functions/%s", cfg.projectID, cfg.region, functionName),
 	}
@@ -331,11 +335,47 @@ type SimulationDetails struct {
 	InstanceID string `firestore:"instance_id"`
 }
 
+// resolveDatabaseID, resolveBucketName, and resolveReceiveFunctionName provide
+// best-effort convenience defaults for manual runs when --database-id,
+// --bucket-name, or --service-url are omitted. CI pipelines should pass the
+// exact values from `terraform output` (firestore_database_id,
+// simulation_files_bucket_name, receive_request_function_url) because
+// Terraform normalizes and truncates/hashes long workspace names.
+func resolveDatabaseID(cfg config) string {
+	if cfg.databaseID != "" {
+		return cfg.databaseID
+	}
+	name := cfg.projectID + "-simulator"
+	if cfg.environment != "" {
+		name += "-" + cfg.environment
+	}
+	return name
+}
+
+func resolveBucketName(cfg config) string {
+	if cfg.bucketName != "" {
+		return cfg.bucketName
+	}
+	name := cfg.projectID + "-simulation_files"
+	if cfg.environment != "" {
+		name += "-" + cfg.environment
+	}
+	return name
+}
+
+func resolveReceiveFunctionName(cfg config) string {
+	name := "simulation-orchestrator-receive-requests"
+	if cfg.environment != "" {
+		name += "-" + cfg.environment
+	}
+	return name
+}
+
 func pollForCompletion(ctx context.Context, simulationID string, cfg config) (SimulationDetails, string, error) {
 	pollCtx, cancel := context.WithTimeout(ctx, cfg.timeout)
 	defer cancel()
 
-	dbID := fmt.Sprintf("cloud-telemetry-simulation-simulator-%s", cfg.environment)
+	dbID := resolveDatabaseID(cfg)
 	firestoreClient, err := firestore.NewClientWithDatabase(ctx, cfg.projectID, dbID)
 	if err != nil {
 		return SimulationDetails{}, "", fmt.Errorf("firestore.NewClientWithDatabase: %w", err)
@@ -392,7 +432,7 @@ func checkSimulationStatus(ctx context.Context, client *firestore.Client, simula
 
 func verifyResultsExist(ctx context.Context, simulationID string, cfg config) error {
 	log.Println("🔎 Verifying simulation results in Cloud Storage...")
-	resultsBucket := fmt.Sprintf("%s-simulation_files-%s", cfg.projectID, cfg.environment)
+	resultsBucket := resolveBucketName(cfg)
 	prefix := fmt.Sprintf("simulations/%s/outputs/telemetry_simulator_out/", simulationID)
 
 	storageClient, err := storage.NewClient(ctx)

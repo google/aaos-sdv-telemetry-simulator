@@ -55,7 +55,101 @@ func TestMain(m *testing.M) {
 }
 
 func TestE2E(t *testing.T) {
+	if cfg.projectID == "" && cfg.owner == "" && cfg.serviceURL == "" && cfg.databaseID == "" && cfg.bucketName == "" {
+		t.Skip("no E2E flags provided; skipping live deployment validation")
+	}
 	if err := run(cfg); err != nil {
 		t.Fatalf("E2E Test Failed: %v", err)
+	}
+}
+
+func TestResolveDatabaseID(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  config
+		want string
+	}{
+		{
+			name: "explicit database-id override",
+			cfg:  config{projectID: "my-project", environment: "staging", databaseID: "custom-db"},
+			want: "custom-db",
+		},
+		{
+			name: "empty environment omits trailing hyphen",
+			cfg:  config{projectID: "my-project", environment: ""},
+			want: "my-project-simulator",
+		},
+		{
+			name: "non-empty environment appends suffix",
+			cfg:  config{projectID: "my-project", environment: "staging"},
+			want: "my-project-simulator-staging",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolveDatabaseID(tt.cfg); got != tt.want {
+				t.Errorf("resolveDatabaseID(%+v) = %q, want %q", tt.cfg, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveBucketName(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  config
+		want string
+	}{
+		{
+			name: "explicit bucket-name override",
+			cfg:  config{projectID: "my-project", environment: "staging", bucketName: "custom-bucket"},
+			want: "custom-bucket",
+		},
+		{
+			name: "empty environment omits trailing hyphen",
+			cfg:  config{projectID: "my-project", environment: ""},
+			want: "my-project-simulation_files",
+		},
+		{
+			name: "non-empty environment appends suffix",
+			cfg:  config{projectID: "my-project", environment: "staging"},
+			want: "my-project-simulation_files-staging",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolveBucketName(tt.cfg); got != tt.want {
+				t.Errorf("resolveBucketName(%+v) = %q, want %q", tt.cfg, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveReceiveFunctionName(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  config
+		want string
+	}{
+		{
+			name: "empty environment omits trailing hyphen",
+			cfg:  config{environment: ""},
+			want: "simulation-orchestrator-receive-requests",
+		},
+		{
+			name: "non-empty environment appends suffix",
+			cfg:  config{environment: "staging"},
+			want: "simulation-orchestrator-receive-requests-staging",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolveReceiveFunctionName(tt.cfg); got != tt.want {
+				t.Errorf("resolveReceiveFunctionName(%+v) = %q, want %q", tt.cfg, got, tt.want)
+			}
+		})
 	}
 }
