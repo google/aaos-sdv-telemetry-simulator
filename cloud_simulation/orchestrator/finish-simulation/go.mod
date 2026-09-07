@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/firestore v1.18.0
 	go.uber.org/mock v0.5.2
 	google.golang.org/api v0.246.0
-	google.golang.org/protobuf v1.36.7
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
