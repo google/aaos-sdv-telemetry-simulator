@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	cloud.google.com/go/firestore v1.18.0
 	github.com/stretchr/testify v1.10.0
-	go.uber.org/mock v0.5.2
+	go.uber.org/mock v0.6.0
 	google.golang.org/api v0.246.0
 	google.golang.org/grpc v1.74.2
 )

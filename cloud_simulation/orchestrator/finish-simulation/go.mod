@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	cloud.google.com/go/compute v1.42.0
 	cloud.google.com/go/firestore v1.18.0
-	go.uber.org/mock v0.5.2
+	go.uber.org/mock v0.6.0
 	google.golang.org/api v0.246.0
 	google.golang.org/protobuf v1.36.12
 )
