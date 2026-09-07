@@ -42,8 +42,8 @@ go_test(
     name = "simulation-agent_test",
     srcs = ["main_test.go"],
     data = [
-        "//cloud_simulation/simulation-agent/agent/testdata/metrics_config:metrics_configs",
-        "//cloud_simulation/simulation-agent/agent/testdata/publisher_config:publisher_configs",
+        "//testdata/metrics_config:metrics_configs",
+        "//testdata/publisher_config:publisher_configs",
     ],
     embed = [":simulation-agent_lib"],
     deps = [

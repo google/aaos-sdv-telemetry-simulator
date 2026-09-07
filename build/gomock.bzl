@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Build rules for generating Go mock libraries using gomock."""
+
 load("@rules_go//docs/go/extras:extras.bzl", "gomock")
 load("@rules_go//go:def.bzl", "go_library")
 

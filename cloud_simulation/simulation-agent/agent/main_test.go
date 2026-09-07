@@ -55,7 +55,7 @@ func TestAgent(t *testing.T) {
 		finishURL:         "http://finish.url",
 		simulationBucket:  "simulationBucket",
 		instanceName:      "test-1",
-		configsPath:       "testdata/",
+		configsPath:       "../../../testdata/",
 		outputsDir:        tempOutputsDir,
 		maxSimulationTime: 60,
 		maxReportCount:    3,
@@ -112,13 +112,13 @@ func TestAgent(t *testing.T) {
 		mockAdb.EXPECT().Connect().Return(nil)
 		mockAdb.EXPECT().Shell("echo", "VM running").Return(nil)
 		mockAdb.EXPECT().Root().Return(nil)
-		mockAdb.EXPECT().Push("testdata/metrics_config/average_speed.txtpb", "/data/local/tmp/average_speed.txtpb").Return(nil)
-		mockAdb.EXPECT().Push("testdata/metrics_config/average_speed_vector.txtpb", "/data/local/tmp/average_speed_vector.txtpb").Return(nil)
-		mockAdb.EXPECT().Push("testdata/metrics_config/journey_summary.txtpb", "/data/local/tmp/journey_summary.txtpb").Return(nil)
-		mockAdb.EXPECT().Push("testdata/publisher_config/error_publisher_config.txtpb", "/data/local/tmp/error_publisher_config.txtpb").Return(nil)
-		mockAdb.EXPECT().Push("testdata/publisher_config/error_publisher_data.csv", "/data/local/tmp/error_publisher_data.csv").Return(nil)
-		mockAdb.EXPECT().Push("testdata/publisher_config/speed_publisher_config.txtpb", "/data/local/tmp/speed_publisher_config.txtpb").Return(nil)
-		mockAdb.EXPECT().Push("testdata/publisher_config/speed_publisher_data.csv", "/data/local/tmp/speed_publisher_data.csv").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed.textproto", "/data/local/tmp/average_speed.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed_vector.textproto", "/data/local/tmp/average_speed_vector.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/metrics_config/journey_summary.textproto", "/data/local/tmp/journey_summary.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/error_publisher_config.textproto", "/data/local/tmp/error_publisher_config.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/error_publisher_data.csv", "/data/local/tmp/error_publisher_data.csv").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/speed_publisher_config.textproto", "/data/local/tmp/speed_publisher_config.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/speed_publisher_data.csv", "/data/local/tmp/speed_publisher_data.csv").Return(nil)
 		mockAdb.EXPECT().Logcat().Return(
 			io.NopCloser(strings.NewReader("")),
 			io.NopCloser(strings.NewReader("")),
@@ -128,8 +128,8 @@ func TestAgent(t *testing.T) {
 			"sdv_telemetry_simulator",
 			"--max-simulation-time", "seconds:60",
 			"full-simulation",
-			"--metrics-configs", "/data/local/tmp/average_speed.txtpb /data/local/tmp/average_speed_vector.txtpb /data/local/tmp/journey_summary.txtpb ",
-			"--publisher-configs", "/data/local/tmp/error_publisher_config.txtpb /data/local/tmp/speed_publisher_config.txtpb ",
+			"--metrics-configs", "/data/local/tmp/average_speed.textproto /data/local/tmp/average_speed_vector.textproto /data/local/tmp/journey_summary.textproto ",
+			"--publisher-configs", "/data/local/tmp/error_publisher_config.textproto /data/local/tmp/speed_publisher_config.textproto ",
 			"--max-report-count", "3")
 		mockAdb.EXPECT().Bugreport(filepath.Join(agent.outputsDir, "bugreport.zip")).Return(nil)
 		mockAdb.EXPECT().Pull("/data/local/tmp/telemetry_simulator_out/", agent.outputsDir)
@@ -209,7 +209,7 @@ func TestAgent(t *testing.T) {
 		mockAdb.EXPECT().Connect().Return(nil)
 		mockAdb.EXPECT().Shell("echo", "VM running").Return(nil)
 		mockAdb.EXPECT().Root().Return(nil)
-		mockAdb.EXPECT().Push("testdata/metrics_config/average_speed.txtpb", "/data/local/tmp/average_speed.txtpb").Return(assert.AnError)
+		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed.textproto", "/data/local/tmp/average_speed.textproto").Return(assert.AnError)
 
 		mockStorage.EXPECT().Upload(ctx, "gs://simulationBucket/simulations/"+simulationID+"/outputs/", agent.outputsDir).Return(nil)
 

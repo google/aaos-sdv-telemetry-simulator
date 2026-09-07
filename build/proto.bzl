@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Build rules for compiling Protocol Buffers."""
+
 load("@protobuf_src//bazel/common:proto_info.bzl", "ProtoInfo")
 
 def _txtpb_to_binpb_impl(ctx):

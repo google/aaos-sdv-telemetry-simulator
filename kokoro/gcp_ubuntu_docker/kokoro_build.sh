@@ -85,7 +85,7 @@ run_test() {
 
 run_test runuser -u bazeluser -- bazel test --test_output=all //...
 
-run_test runuser -u bazeluser -- bazel run //tools:buildifier -- -lint fix -r .
+run_test runuser -u bazeluser -- bazel run //tools:buildifier -- -mode check -lint warn -r .
 run_test runuser -u bazeluser -- bazel run //tools:go -- run cmd/gofmt -l -w **/*.go
 run_test runuser -u bazeluser -- bazel run //tools:gazelle -- --strict
 run_test runuser -u bazeluser -- find . -name "go.mod" -execdir bazel run //tools:go -- mod tidy \;
