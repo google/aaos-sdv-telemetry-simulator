@@ -139,7 +139,7 @@ steps:
         fi
 
   # Validation Step
-  - name: 'eu.gcr.io/cloud-telemetry-simulation/bazel:7.2.1'
+  - name: 'eu.gcr.io/cloud-telemetry-simulation/bazel:9.2.0'
     id: 'Deployment Validation'
     waitFor:
      - 'Deploy Web Demo'
