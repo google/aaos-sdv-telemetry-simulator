@@ -1,6 +1,6 @@
 module simulator.code/simulation-scheduler
 
-go 1.25.4
+go 1.26.8
 
 require (
 	cloud.google.com/go/compute v1.42.0

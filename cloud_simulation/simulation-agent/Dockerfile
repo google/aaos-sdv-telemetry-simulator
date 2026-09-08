@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Build stage: Build the Go executable
-FROM golang:1.25 AS agent-builder
+FROM golang:1.26 AS agent-builder
 
 COPY agent /agent
 WORKDIR /agent

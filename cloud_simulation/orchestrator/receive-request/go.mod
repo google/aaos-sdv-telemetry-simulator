@@ -1,6 +1,6 @@
 module simulator.code/receive-request
 
-go 1.25.4
+go 1.26.8
 
 require (
 	cloud.google.com/go/firestore v1.18.0

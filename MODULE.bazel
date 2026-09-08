@@ -84,7 +84,7 @@ python.toolchain(
 
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.nogo(nogo = "//:my_nogo")
-go_sdk.download(version = "1.25.4")
+go_sdk.download(version = "1.26.8")
 
 go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_work = "//:go.work")

@@ -170,7 +170,7 @@ module "simulation_orchestrator_function" {
 
   function_config = {
     entry_point = "HandleSimulationRequest"
-    runtime     = "go125"
+    runtime     = "go126"
   }
 
   environment_variables = {
@@ -211,7 +211,7 @@ module "simulation_deletion_function" {
 
   function_config = {
     entry_point = "HandleCancellationRequest"
-    runtime     = "go125"
+    runtime     = "go126"
   }
 
   environment_variables = {
@@ -249,7 +249,7 @@ module "simulation_finisher_function" {
 
   function_config = {
     entry_point = "FinishSimulation"
-    runtime     = "go125"
+    runtime     = "go126"
   }
 
   environment_variables = {
@@ -287,7 +287,7 @@ module "simulation_reader_function" {
 
   function_config = {
     entry_point = "HandleReadRequest"
-    runtime     = "go125"
+    runtime     = "go126"
   }
 
   environment_variables = {
@@ -392,7 +392,7 @@ module "scheduler_function" {
 
   function_config = {
     entry_point = "HandleScheduleTrigger"
-    runtime     = "go125"
+    runtime     = "go126"
   }
 
   environment_variables = {

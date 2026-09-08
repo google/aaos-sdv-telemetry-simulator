@@ -28,7 +28,7 @@ various other GCP services to orchestrate and manage simulation tasks.
 - Google Cloud Platform account
 - Google Cloud SDK (gcloud CLI)
 - Appropriate GCP project permissions
-- Go 1.25.4 (for orchestrator functions)
+- Go 1.26.8 (for orchestrator functions)
 
 ### Project Structure
 
