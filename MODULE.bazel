@@ -47,7 +47,7 @@ bazel_dep(
 )
 bazel_dep(
     name = "rules_python",
-    version = "1.5.1",
+    version = "1.7.0",
 )
 bazel_dep(
     name = "rules_shellcheck",
@@ -55,16 +55,16 @@ bazel_dep(
 )
 bazel_dep(
     name = "protobuf",
-    version = "29.3",
+    version = "33.4",
     repo_name = "protobuf_src",
 )
 bazel_dep(
     name = "bazel_skylib",
-    version = "1.8.1",
+    version = "1.8.2",
 )
 bazel_dep(
     name = "rules_shell",
-    version = "0.5.0",
+    version = "0.6.1",
 )
 bazel_dep(
     name = "aspect_bazel_lib",
