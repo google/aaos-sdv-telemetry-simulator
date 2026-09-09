@@ -153,36 +153,55 @@ func (a *agent) startVM(withInstanceName bool) error {
 	return nil
 }
 
+// poll calls condition repeatedly at the given interval until it returns true or timeout expires.
+// It returns true if condition succeeded, or false if the timeout was reached.
+func poll(timeout, interval time.Duration, condition func(attempt int) bool) bool {
+	deadline := time.Now().Add(timeout)
+	for attempt := 0; ; attempt++ {
+		if condition(attempt) {
+			return true
+		}
+		if !time.Now().Before(deadline) {
+			return false
+		}
+		time.Sleep(interval)
+	}
+}
+
 func (a *agent) waitForVM() error {
-	timeout := 5 * time.Minute
-	sleep := 1 * time.Second
-	iters := int(timeout.Nanoseconds() / sleep.Nanoseconds())
-	var connected bool
-	for it := 0; it < iters; it++ {
-		a.logger.Debug("An attempt connecting...", "attempt", it)
+	booted := poll(5*time.Minute, 1*time.Second, func(attempt int) bool {
+		a.logger.Debug("Attempting to connect to VM...", "attempt", attempt)
 		if err := a.adbClient.Connect(); err != nil {
-			time.Sleep(sleep)
-			continue
+			return false
 		}
 
-		if err := a.adbClient.Shell("echo", "VM running"); err == nil {
-			// VM has succeeded to execute a command so it's ready
-			connected = true
-			break
-		}
-
-		time.Sleep(sleep)
+		out, err := a.adbClient.Shell("getprop", "sys.boot_completed")
+		return err == nil && out == "1"
+	})
+	if !booted {
+		return fmt.Errorf("timed out waiting for VM to boot")
 	}
 
-	if !connected {
-		return fmt.Errorf("timed out waiting for VM to be ready")
-	}
-
-	a.logger.Info("Connected to VM")
+	a.logger.Info("VM booted successfully, switching adb to root")
 
 	if err := a.adbClient.Root(); err != nil {
-		return fmt.Errorf("Failed to restart adb deamon with root permissions: %w", err)
+		return fmt.Errorf("Failed to restart adb daemon with root permissions: %w", err)
 	}
+
+	// Wait for adb to reconnect as root after restarting adbd
+	rootReady := poll(1*time.Minute, 1*time.Second, func(attempt int) bool {
+		if err := a.adbClient.Connect(); err != nil {
+			return false
+		}
+
+		out, err := a.adbClient.Shell("whoami")
+		return err == nil && out == "root"
+	})
+	if !rootReady {
+		return fmt.Errorf("timed out waiting for adb root reconnection")
+	}
+
+	a.logger.Info("Connected to VM as root")
 	return nil
 }
 
@@ -274,7 +293,7 @@ func (a *agent) runTelemetrySimulator(metricsConfigs, publisherConfigs string, m
 	}
 
 	// Run the simulation and store the error to return it later.
-	simErr := a.adbClient.Shell(
+	_, simErr := a.adbClient.Shell(
 		"sdv_telemetry_simulator",
 		"--max-simulation-time", fmt.Sprintf("seconds:%d", max_simulation_time),
 		"full-simulation",

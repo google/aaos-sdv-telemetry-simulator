@@ -80,7 +80,7 @@ type adbClient interface {
 	LaunchCvd(withInstanceName bool) (io.ReadCloser, io.ReadCloser, error)
 	StopCvd() error
 	Connect() error
-	Shell(args ...string) error
+	Shell(args ...string) (string, error)
 	Root() error
 	Push(localSrc, deviceDst string) error
 	Pull(deviceSrc, localDst string) error

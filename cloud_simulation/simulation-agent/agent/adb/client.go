@@ -17,6 +17,7 @@ package adb
 import (
 	"io"
 	"os/exec"
+	"strings"
 )
 
 var (
@@ -30,7 +31,7 @@ type Client interface {
 	LaunchCvd(withInstanceName bool) (io.ReadCloser, io.ReadCloser, error)
 	StopCvd() error
 	Connect() error
-	Shell(args ...string) error
+	Shell(args ...string) (string, error)
 	Root() error
 	Push(localSrc, deviceDst string) error
 	Pull(deviceSrc, localDst string) error
@@ -82,12 +83,13 @@ func (ac client) Connect() error {
 	return connectCmd.Run()
 }
 
-func (ac client) Shell(args ...string) error {
+func (ac client) Shell(args ...string) (string, error) {
 	cmdArgs := []string{"shell"}
 	cmdArgs = append(cmdArgs, args...)
 
 	shellCmd := exec.Command(ADB_PATH, cmdArgs...)
-	return shellCmd.Run()
+	out, err := shellCmd.Output()
+	return strings.TrimSpace(string(out)), err
 }
 
 func (ac client) Root() error {

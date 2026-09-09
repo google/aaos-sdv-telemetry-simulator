@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -110,8 +111,10 @@ func TestAgent(t *testing.T) {
 			nil,
 		)
 		mockAdb.EXPECT().Connect().Return(nil)
-		mockAdb.EXPECT().Shell("echo", "VM running").Return(nil)
+		mockAdb.EXPECT().Shell("getprop", "sys.boot_completed").Return("1", nil)
 		mockAdb.EXPECT().Root().Return(nil)
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("whoami").Return("root", nil)
 		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed.textproto", "/data/local/tmp/average_speed.textproto").Return(nil)
 		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed_vector.textproto", "/data/local/tmp/average_speed_vector.textproto").Return(nil)
 		mockAdb.EXPECT().Push("../../../testdata/metrics_config/journey_summary.textproto", "/data/local/tmp/journey_summary.textproto").Return(nil)
@@ -207,9 +210,43 @@ func TestAgent(t *testing.T) {
 			nil,
 		)
 		mockAdb.EXPECT().Connect().Return(nil)
-		mockAdb.EXPECT().Shell("echo", "VM running").Return(nil)
+		mockAdb.EXPECT().Shell("getprop", "sys.boot_completed").Return("1", nil)
 		mockAdb.EXPECT().Root().Return(nil)
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("whoami").Return("root", nil)
 		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed.textproto", "/data/local/tmp/average_speed.textproto").Return(assert.AnError)
+
+		mockStorage.EXPECT().Upload(ctx, "gs://simulationBucket/simulations/"+simulationID+"/outputs/", agent.outputsDir).Return(nil)
+
+		expectedPayload := finisher.Payload{
+			ID:         simulationID,
+			ProjectID:  projectID,
+			Zone:       zone,
+			InstanceID: agent.instanceName,
+			DocumentID: agent.documentID,
+			Status:     "failed",
+		}
+		mockFinisher.EXPECT().Finish(ctx, agent.finishURL, expectedPayload).Return(nil)
+
+		err = agent.executeSimulation(ctx, projectID, zone)
+
+		assert.Error(t, err)
+	})
+
+	t.Run("executeSimulation fails on adb root", func(t *testing.T) {
+		setupAndroidInfo(t)
+		mockStorage.EXPECT().Download(ctx, "gs://simulationBucket/simulations/"+simulationID+"/inputs/").Return(nil)
+
+		mockAdb.EXPECT().StopCvd().Return(nil)
+		mockAdb.EXPECT().StartServer().Return(nil)
+		mockAdb.EXPECT().LaunchCvd(true).Return(
+			io.NopCloser(strings.NewReader("")),
+			io.NopCloser(strings.NewReader("")),
+			nil,
+		)
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("getprop", "sys.boot_completed").Return("1", nil)
+		mockAdb.EXPECT().Root().Return(assert.AnError)
 
 		mockStorage.EXPECT().Upload(ctx, "gs://simulationBucket/simulations/"+simulationID+"/outputs/", agent.outputsDir).Return(nil)
 
@@ -240,8 +277,10 @@ func TestAgent(t *testing.T) {
 			nil,
 		)
 		mockAdb.EXPECT().Connect().Return(nil)
-		mockAdb.EXPECT().Shell("echo", "VM running").Return(nil)
+		mockAdb.EXPECT().Shell("getprop", "sys.boot_completed").Return("1", nil)
 		mockAdb.EXPECT().Root().Return(nil)
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("whoami").Return("root", nil)
 		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed.textproto", "/data/local/tmp/average_speed.textproto").Return(nil)
 		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed_vector.textproto", "/data/local/tmp/average_speed_vector.textproto").Return(nil)
 		mockAdb.EXPECT().Push("../../../testdata/metrics_config/journey_summary.textproto", "/data/local/tmp/journey_summary.textproto").Return(nil)
@@ -260,7 +299,7 @@ func TestAgent(t *testing.T) {
 			"full-simulation",
 			"--metrics-configs", "/data/local/tmp/average_speed.textproto /data/local/tmp/average_speed_vector.textproto /data/local/tmp/journey_summary.textproto ",
 			"--publisher-configs", "/data/local/tmp/error_publisher_config.textproto /data/local/tmp/speed_publisher_config.textproto ",
-			"--max-report-count", "3").Return(assert.AnError)
+			"--max-report-count", "3").Return("", assert.AnError)
 		mockAdb.EXPECT().Bugreport(filepath.Join(agent.outputsDir, "bugreport.zip")).Return(nil)
 		mockAdb.EXPECT().Pull("/data/local/tmp/telemetry_simulator_out/", agent.outputsDir).Return(nil)
 
@@ -280,5 +319,37 @@ func TestAgent(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), assert.AnError.Error())
+	})
+}
+
+func TestPoll(t *testing.T) {
+	t.Run("immediate success", func(t *testing.T) {
+		calls := 0
+		ok := poll(1*time.Second, 10*time.Millisecond, func(attempt int) bool {
+			calls++
+			return true
+		})
+		assert.True(t, ok)
+		assert.Equal(t, 1, calls)
+	})
+
+	t.Run("success after retries", func(t *testing.T) {
+		calls := 0
+		ok := poll(1*time.Second, 10*time.Millisecond, func(attempt int) bool {
+			calls++
+			return attempt >= 2
+		})
+		assert.True(t, ok)
+		assert.Equal(t, 3, calls)
+	})
+
+	t.Run("timeout", func(t *testing.T) {
+		calls := 0
+		ok := poll(50*time.Millisecond, 10*time.Millisecond, func(attempt int) bool {
+			calls++
+			return false
+		})
+		assert.False(t, ok)
+		assert.GreaterOrEqual(t, calls, 2)
 	})
 }
