@@ -114,12 +114,14 @@ func (a *agent) runSimulationAttempt(configs_dir string, max_simulation_time, ma
 	a.logger.Info("Pushing metrics config")
 	metricsConfigs, err := a.pushMetricsConfigs(metricsDir)
 	if err != nil {
+		a.logger.Error("Failed to push metrics configs", "error", err)
 		return fmt.Errorf("Failed to push metrics configs: %w", err)
 	}
 
 	a.logger.Info("Pushing publisher config")
 	publisherConfigs, err := a.pushPublisherConfigs(publishersDir)
 	if err != nil {
+		a.logger.Error("Failed to push publisher configs", "error", err)
 		return fmt.Errorf("Failed to push publisher configs: %w", err)
 	}
 
@@ -132,7 +134,7 @@ func (a *agent) runSimulationAttempt(configs_dir string, max_simulation_time, ma
 	}
 
 	if simulatorErr != nil {
-		return fmt.Errorf("Error running simulator: %w", err)
+		return fmt.Errorf("Error running simulator: %w", simulatorErr)
 	}
 
 	return nil
@@ -323,8 +325,9 @@ func (a *agent) collectOutputFiles() error {
 	}
 
 	// Always try to copy the logcat file.
-	if err := copyFile(LOGCAT_FILE_PATH, a.outputsDir+"logs/logcat"); err != nil {
-		a.logger.Warn("error copying logcat file", "source", LOGCAT_FILE_PATH, "destination", a.outputsDir+"logs/logcat", "error", err)
+	logcatDst := filepath.Join(a.outputsDir, "logs", "logcat")
+	if err := copyFile(LOGCAT_FILE_PATH, logcatDst); err != nil {
+		a.logger.Warn("error copying logcat file", "source", LOGCAT_FILE_PATH, "destination", logcatDst, "error", err)
 	}
 	return nil
 }

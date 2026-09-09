@@ -227,4 +227,58 @@ func TestAgent(t *testing.T) {
 
 		assert.Error(t, err)
 	})
+
+	t.Run("executeSimulation fails on simulator error", func(t *testing.T) {
+		setupAndroidInfo(t)
+		mockStorage.EXPECT().Download(ctx, "gs://simulationBucket/simulations/"+simulationID+"/inputs/").Return(nil)
+
+		mockAdb.EXPECT().StopCvd().Return(nil)
+		mockAdb.EXPECT().StartServer().Return(nil)
+		mockAdb.EXPECT().LaunchCvd(true).Return(
+			io.NopCloser(strings.NewReader("")),
+			io.NopCloser(strings.NewReader("")),
+			nil,
+		)
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("echo", "VM running").Return(nil)
+		mockAdb.EXPECT().Root().Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed.textproto", "/data/local/tmp/average_speed.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed_vector.textproto", "/data/local/tmp/average_speed_vector.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/metrics_config/journey_summary.textproto", "/data/local/tmp/journey_summary.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/error_publisher_config.textproto", "/data/local/tmp/error_publisher_config.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/error_publisher_data.csv", "/data/local/tmp/error_publisher_data.csv").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/speed_publisher_config.textproto", "/data/local/tmp/speed_publisher_config.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/speed_publisher_data.csv", "/data/local/tmp/speed_publisher_data.csv").Return(nil)
+		mockAdb.EXPECT().Logcat().Return(
+			io.NopCloser(strings.NewReader("")),
+			io.NopCloser(strings.NewReader("")),
+			nil,
+		)
+		mockAdb.EXPECT().Shell(
+			"sdv_telemetry_simulator",
+			"--max-simulation-time", "seconds:60",
+			"full-simulation",
+			"--metrics-configs", "/data/local/tmp/average_speed.textproto /data/local/tmp/average_speed_vector.textproto /data/local/tmp/journey_summary.textproto ",
+			"--publisher-configs", "/data/local/tmp/error_publisher_config.textproto /data/local/tmp/speed_publisher_config.textproto ",
+			"--max-report-count", "3").Return(assert.AnError)
+		mockAdb.EXPECT().Bugreport(filepath.Join(agent.outputsDir, "bugreport.zip")).Return(nil)
+		mockAdb.EXPECT().Pull("/data/local/tmp/telemetry_simulator_out/", agent.outputsDir).Return(nil)
+
+		mockStorage.EXPECT().Upload(ctx, "gs://simulationBucket/simulations/"+simulationID+"/outputs/", agent.outputsDir).Return(nil)
+
+		expectedPayload := finisher.Payload{
+			ID:         simulationID,
+			ProjectID:  projectID,
+			Zone:       zone,
+			InstanceID: agent.instanceName,
+			DocumentID: agent.documentID,
+			Status:     "failed",
+		}
+		mockFinisher.EXPECT().Finish(ctx, agent.finishURL, expectedPayload).Return(nil)
+
+		err = agent.executeSimulation(ctx, projectID, zone)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), assert.AnError.Error())
+	})
 }

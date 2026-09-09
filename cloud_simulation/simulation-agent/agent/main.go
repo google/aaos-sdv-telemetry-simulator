@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -108,6 +109,12 @@ func NewAgent(s storageClient, f finisherClient, a adbClient, md, sim, sb, insta
 
 func (a *agent) runSimulationLifecycle(ctx context.Context) error {
 	a.logger.Info("Starting simulation lifecycle")
+
+	// Ensure outputs directory exists so uploads and logging always succeed even if the simulation fails early.
+	if err := os.MkdirAll(filepath.Join(a.outputsDir, "logs"), 0755); err != nil {
+		a.logger.Warn("Failed to create outputs directory", "dir", a.outputsDir, "error", err)
+	}
+
 	// Download required input files
 	if err := a.storageClient.Download(ctx, "gs://"+a.simulationBucket+"/simulations/"+a.simulationID+"/inputs/"); err != nil {
 		return fmt.Errorf("error downloading simulation input data from object storage: %w", err)
@@ -116,6 +123,9 @@ func (a *agent) runSimulationLifecycle(ctx context.Context) error {
 
 	// Run simulation business logic
 	simulationErr := a.runSimulation(a.configsPath, a.maxSimulationTime, a.maxReportCount)
+	if simulationErr != nil {
+		a.logger.Error("Simulation failed", "error", simulationErr)
+	}
 
 	// Always try to upload simulation results, even if the simulation failed.
 	// This ensures logs and partial results are captured.
