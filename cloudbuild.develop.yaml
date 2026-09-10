@@ -40,10 +40,10 @@ steps:
         mkdir -p cloud_simulation/infrastructure/environments/$${_ENVIRONMENT}
         echo "Downloading configs for $${_ENVIRONMENT} from gs://${_CONFIG_BUCKET}..."
 
-        gsutil cp gs://${_CONFIG_BUCKET}/$${_ENVIRONMENT}/backend.hcl \
+        gcloud storage cp gs://${_CONFIG_BUCKET}/$${_ENVIRONMENT}/backend.hcl \
           cloud_simulation/infrastructure/environments/$${_ENVIRONMENT}/backend.hcl
 
-        gsutil cp gs://${_CONFIG_BUCKET}/$${_ENVIRONMENT}/variables.tfvars \
+        gcloud storage cp gs://${_CONFIG_BUCKET}/$${_ENVIRONMENT}/variables.tfvars \
           cloud_simulation/infrastructure/environments/$${_ENVIRONMENT}/variables.tfvars
 
   # 1. Detect changes
