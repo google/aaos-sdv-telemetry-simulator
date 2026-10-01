@@ -1,0 +1,50 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+project_id       = "<PROJECT_ID>"
+environment      = "example"
+location         = "EU"
+location_id      = "eur3"
+default_region   = "europe-west3"
+default_zone     = "europe-west3-b"
+subnet_name      = "default"
+ingress_settings = "ALLOW_INTERNAL_ONLY"
+vpc_connector = {
+  create          = true
+  name            = "simulator"
+  egress_settings = "ALL_TRAFFIC"
+}
+vpc_connector_config = {
+  ip_cidr_range = "10.0.0.0/28"
+  network       = "default"
+  instances = {
+    max = 10
+    min = 2
+  }
+}
+
+agent_docker_image = "europe-west3-docker.pkg.dev/<PROJECT_ID>/simulation/simulation-agent"
+
+// Setting service account variables to null instructs Terraform (see
+// service_accounts.tf) to automatically create and bind new service accounts
+// for each component. Specify existing service account emails here if they are
+// pre-provisioned externally.
+receive_request_function_sa   = null
+delete_simulation_function_sa = null
+simulation_finisher_sa        = null
+scheduler_trigger_sa          = null
+scheduler_function_sa         = null
+simulation_agent_sa           = null
+cleanup_scheduler_sa          = null
+simulation_reader_function_sa = null

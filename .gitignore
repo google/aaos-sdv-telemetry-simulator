@@ -34,3 +34,8 @@ sdv_core_cf-img-*.zip
 
 # Generated Flutter config
 /cloud_simulation/web_demo/frontend/assets/config.json
+
+# Environment configurations
+/cloud_simulation/infrastructure/environments/**/*.hcl
+/cloud_simulation/infrastructure/**/*.tfvars
+/cloud_simulation/infrastructure/**/*.tfvars.json
