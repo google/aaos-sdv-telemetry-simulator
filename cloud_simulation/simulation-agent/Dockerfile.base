@@ -1,0 +1,47 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Split pipeline architecture: The CI/CD pipeline builds the simulation
+# agent image in two distinct stages. Both stages must run to get a
+# complete image.
+#
+# 1. Dockerfile.base: Cuttlefish orchestration base + SDV build artifacts
+#    (host package & image zip). These artifacts must be present in the
+#    build context, fetched by the pipeline. Tagged per SDV build so it
+#    can be reused.
+# 2. Dockerfile.agent: A thin layer on top of a base image that adds the
+#    pre-compiled agent binary. Prerequisite: agent-binary must be built
+#    beforehand by the pipeline; the FROM argument selects the base tag.
+
+FROM us-docker.pkg.dev/android-cuttlefish-artifacts/cuttlefish-orchestration/cuttlefish-orchestration
+
+ENV ANDROID_SDK_ROOT=/android/sdk
+ENV PATH=$PATH:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/tools:$ANDROID_SDK_ROOT/tools/bin:$ANDROID_SDK_ROOT/platform-tools
+
+RUN apt-get update && apt-get install -y --no-install-recommends unzip && rm -rf /var/lib/apt/lists/*
+
+ARG SDV_BUILD_ID=""
+ARG SDV_BRANCH=""
+ARG SDV_TARGET=""
+
+COPY sdv-image-resources/ /opt/android/
+
+RUN tar -xzf /opt/android/cvd-host_package.tar.gz -C /opt/android/ && \
+    set -- /opt/android/*-img-*.zip && \
+    if [ "$#" -eq 1 ] && [ -f "$1" ]; then unzip "$1" -d /opt/android/ && rm /opt/android/cvd-host_package.tar.gz "$1"; else echo "Expected exactly one image zip" >&2; exit 1; fi
+
+WORKDIR /opt/android/
+ENV HOME=/opt/android/
+
+LABEL sdv.build_id="${SDV_BUILD_ID}" sdv.branch="${SDV_BRANCH}" sdv.target="${SDV_TARGET}"
