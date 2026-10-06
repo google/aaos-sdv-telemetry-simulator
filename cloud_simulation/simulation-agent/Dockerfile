@@ -20,7 +20,7 @@ WORKDIR /agent
 RUN go mod download
 RUN go build -o agent-binary .
 
-FROM europe-docker.pkg.dev/android-cuttlefish-artifacts/cuttlefish-orchestration/cuttlefish-orchestration
+FROM us-docker.pkg.dev/android-cuttlefish-artifacts/cuttlefish-orchestration/cuttlefish-orchestration
 
 # Set environment variables
 ENV ANDROID_SDK_ROOT=/android/sdk
