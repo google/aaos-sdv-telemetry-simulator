@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "compute",
@@ -26,6 +26,22 @@ go_library(
     deps = [
         "@com_google_cloud_go_compute//apiv1",
         "@com_google_cloud_go_compute//apiv1/computepb",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+alias(
+    name = "update_golden",
+    actual = "//cloud_simulation/orchestrator/schedule-simulation/compute/cmd/update_golden",
+)
+
+go_test(
+    name = "compute_test",
+    srcs = ["builder_test.go"],
+    data = glob(["testdata/**"]),
+    embed = [":compute"],
+    deps = [
+        "@org_golang_google_protobuf//encoding/protojson",
         "@org_golang_google_protobuf//proto",
     ],
 )

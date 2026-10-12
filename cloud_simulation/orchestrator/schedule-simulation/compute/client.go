@@ -104,29 +104,38 @@ func sanitizeInstanceName(simulationID string) string {
 	return simulationID
 }
 
-// Adjusted CreateInstance method
-func (cc client) CreateInstance(ctx context.Context, projectID string, zone string, databaseID string, config InstanceConfig) (string, string, error) {
-	// Sanitize the instance name
+// BuildInstance assembles the complete GCE instance resource for a simulation.
+// Every request field that becomes a VM property passes through here, so its
+// output is pinned by the golden test in builder_test.go.
+func BuildInstance(projectID, zone, databaseID string, config InstanceConfig) *computepb.Instance {
 	instanceName := sanitizeInstanceName(config.SimulationID)
+
+	return &computepb.Instance{
+		Name:                    proto.String(instanceName),
+		MachineType:             proto.String(fmt.Sprintf("projects/%s/zones/%s/machineTypes/%s", projectID, zone, config.InstanceType)),
+		MinCpuPlatform:          proto.String("Intel Haswell"),
+		AdvancedMachineFeatures: buildAdvancedMachineFeatures(),
+		Disks:                   buildDisks(projectID, zone, instanceName, config),
+		NetworkInterfaces:       buildNetworkInterfaces(config),
+		Scheduling:              buildScheduling(config),
+		ServiceAccounts:         buildServiceAccounts(config),
+		ShieldedInstanceConfig:  buildShieldedInstanceConfig(),
+		Labels:                  buildLabels(),
+		Metadata:                buildMetadata(projectID, zone, databaseID, instanceName, config),
+	}
+}
+
+// CreateInstance creates and starts a Compute Engine instance for the simulation.
+func (cc client) CreateInstance(ctx context.Context, projectID, zone, databaseID string, config InstanceConfig) (string, string, error) {
+	resource := BuildInstance(projectID, zone, databaseID, config)
+	instanceName := resource.GetName()
 
 	cc.logger.Info("Creating instance for sanitized id", "sanitized_id", instanceName, "simulation_id", config.SimulationID)
 
 	req := &computepb.InsertInstanceRequest{
-		Project: projectID,
-		Zone:    zone,
-		InstanceResource: &computepb.Instance{
-			Name:                    proto.String(instanceName),
-			MachineType:             proto.String(fmt.Sprintf("projects/%s/zones/%s/machineTypes/%s", projectID, zone, config.InstanceType)),
-			MinCpuPlatform:          proto.String("Intel Haswell"),
-			AdvancedMachineFeatures: buildAdvancedMachineFeatures(),
-			Disks:                   buildDisks(projectID, zone, instanceName, config),
-			NetworkInterfaces:       buildNetworkInterfaces(config),
-			Scheduling:              buildScheduling(config),
-			ServiceAccounts:         buildServiceAccounts(config),
-			ShieldedInstanceConfig:  buildShieldedInstanceConfig(),
-			Labels:                  buildLabels(),
-			Metadata:                buildMetadata(projectID, zone, databaseID, instanceName, config),
-		},
+		Project:          projectID,
+		Zone:             zone,
+		InstanceResource: resource,
 	}
 
 	op, err := cc.instancesClient.Insert(ctx, req)

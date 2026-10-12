@@ -1,0 +1,106 @@
+{
+  "advancedMachineFeatures": {
+    "enableNestedVirtualization": true
+  },
+  "disks": [
+    {
+      "autoDelete": true,
+      "boot": true,
+      "deviceName": "sim-aa27583c-96a5-4a67-adad-d15e00c0f12a",
+      "initializeParams": {
+        "diskSizeGb": "70",
+        "diskType": "projects/test-project/zones/europe-west3-a/diskTypes/pd-balanced",
+        "sourceImage": "projects/cos-cloud/global/images/cos-stable-117-18613-164-38"
+      },
+      "mode": "READ_WRITE",
+      "type": "PERSISTENT"
+    }
+  ],
+  "labels": {
+    "kind": "simulation"
+  },
+  "machineType": "projects/test-project/zones/europe-west3-a/machineTypes/n1-standard-8",
+  "metadata": {
+    "items": [
+      {
+        "key": "project_id",
+        "value": "test-project"
+      },
+      {
+        "key": "zone",
+        "value": "europe-west3-a"
+      },
+      {
+        "key": "database_id",
+        "value": "test-project-simulator"
+      },
+      {
+        "key": "document_id",
+        "value": "doc-abc-123"
+      },
+      {
+        "key": "simulation_id",
+        "value": "aa27583c-96a5-4a67-adad-d15e00c0f12a"
+      },
+      {
+        "key": "simulation_bucket",
+        "value": "test-project-simulation_files"
+      },
+      {
+        "key": "max_simulation_time",
+        "value": "300"
+      },
+      {
+        "key": "max_report_count",
+        "value": "1"
+      },
+      {
+        "key": "finish_function_url",
+        "value": "https://finish.example.com/finish"
+      },
+      {
+        "key": "google-logging-enabled",
+        "value": "true"
+      },
+      {
+        "key": "startup-script",
+        "value": "#!/bin/bash\nset -ex\n\necho \"Startup script begun. Configuring Docker...\"\n\n# We set HOME to a writable location (/home/root) so the credential helper\n# can write the .docker/config.json file.\nexport HOME=/home/root\n\n# Configure docker to authenticate with the specific Artifact Registry region\ndocker-credential-gcr configure-docker --registries=europe-west3-docker.pkg.dev\n\necho \"Authentication configured. Pulling and starting container...\"\n\n# Run the container\ndocker run --name sim-aa27583c-96a5-4a67-adad-d15e00c0f12a \\\n    --privileged \\\n    --volume /dev/kvm:/dev/kvm \\\n    --restart=always \\\n    --detach \\\n    europe-west3-docker.pkg.dev/test-project/simulation/simulation-agent:latest\n\necho \"Container started successfully.\"\n"
+      }
+    ]
+  },
+  "minCpuPlatform": "Intel Haswell",
+  "name": "sim-aa27583c-96a5-4a67-adad-d15e00c0f12a",
+  "networkInterfaces": [
+    {
+      "stackType": "IPV4_ONLY",
+      "subnetwork": "projects/test-project/regions/europe-west3/subnetworks/test-subnet"
+    }
+  ],
+  "scheduling": {
+    "automaticRestart": false,
+    "instanceTerminationAction": "DELETE",
+    "maxRunDuration": {
+      "seconds": "14400"
+    },
+    "onHostMaintenance": "TERMINATE",
+    "provisioningModel": "SPOT"
+  },
+  "serviceAccounts": [
+    {
+      "email": "simulation-agent@example.com",
+      "scopes": [
+        "https://www.googleapis.com/auth/cloud-platform",
+        "https://www.googleapis.com/auth/logging.write",
+        "https://www.googleapis.com/auth/monitoring.write",
+        "https://www.googleapis.com/auth/service.management.readonly",
+        "https://www.googleapis.com/auth/servicecontrol",
+        "https://www.googleapis.com/auth/trace.append"
+      ]
+    }
+  ],
+  "shieldedInstanceConfig": {
+    "enableIntegrityMonitoring": true,
+    "enableSecureBoot": false,
+    "enableVtpm": true
+  }
+}
