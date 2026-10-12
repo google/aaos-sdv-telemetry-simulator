@@ -68,20 +68,39 @@ type config struct {
 }
 
 func defineFlags(cfg *config) {
-	flag.StringVar(&cfg.projectID, "project-id", "", "GCP Project ID where the simulation infrastructure is deployed.")
-	flag.StringVar(&cfg.region, "region", defaultRegion, "Region for the Cloud Function.")
-	flag.StringVar(&cfg.serviceURL, "service-url", "", "Override the Cloud Function URL (if empty, looked up via Cloud Functions API; also used as default OIDC token audience unless --web-client-id or --auth-token is set).")
-	flag.StringVar(&cfg.webClientID, "web-client-id", "", "Add a web client id for token audience, if required.")
-	flag.StringVar(&cfg.environment, "environment", defaultEnvironment, "Convenience environment suffix for manual runs when --service-url, --database-id, or --bucket-name are not explicitly provided.")
-	flag.StringVar(&cfg.databaseID, "database-id", "", "Override the Firestore database ID (pass from terraform output in CI; defaults to <project-id>-simulator[-<environment>]).")
-	flag.StringVar(&cfg.bucketName, "bucket-name", "", "Override the simulation files GCS bucket name (pass from terraform output in CI; defaults to <project-id>-simulation_files[-<environment>]).")
-	flag.StringVar(&cfg.authToken, "auth-token", "", "Bearer token for authorization. Defaults to gcloud identity-token.")
-	flag.StringVar(&cfg.buildID, "build-id", defaultBuildID, "The agent build ID/tag to test.")
-	flag.StringVar(&cfg.instanceType, "instance-type", defaultInstanceType, "GCE instance type for the simulation.")
-	flag.StringVar(&cfg.testFilePath, "test-file-path", defaultTestFilePath, "GCS path for test input files.")
-	flag.StringVar(&cfg.localTestFilesDir, "local-test-files-dir", defaultLocalTestDir, "Local directory with test files to upload. If set, files will be uploaded to GCS before simulation.")
-	flag.StringVar(&cfg.owner, "owner", "", "Owner email for the simulation request.")
-	flag.DurationVar(&cfg.timeout, "timeout", defaultTimeout, "Timeout to wait for simulation completion.")
+	defineFlagsOnSet(flag.CommandLine, cfg)
+}
+
+func defineFlagsOnSet(fs *flag.FlagSet, cfg *config) {
+	fs.StringVar(&cfg.projectID, "project-id", "", "GCP Project ID where the simulation infrastructure is deployed.")
+	fs.StringVar(&cfg.region, "region", defaultRegion, "Region for the Cloud Function.")
+	fs.StringVar(&cfg.serviceURL, "service-url", "", "Override the Cloud Function URL (if empty, looked up via Cloud Functions API; also used as default OIDC token audience unless --web-client-id or --auth-token is set).")
+	fs.StringVar(&cfg.webClientID, "web-client-id", "", "Add a web client id for token audience, if required.")
+	fs.StringVar(&cfg.environment, "environment", defaultEnvironment, "Convenience environment suffix for manual runs when --service-url, --database-id, or --bucket-name are not explicitly provided.")
+	fs.StringVar(&cfg.databaseID, "database-id", "", "Override the Firestore database ID (pass from terraform output in CI; defaults to <project-id>-simulator[-<environment>]).")
+	fs.StringVar(&cfg.bucketName, "bucket-name", "", "Override the simulation files GCS bucket name (pass from terraform output in CI; defaults to <project-id>-simulation_files[-<environment>]).")
+	fs.StringVar(&cfg.authToken, "auth-token", "", "Bearer token for authorization. Defaults to gcloud identity-token.")
+	fs.StringVar(&cfg.buildID, "build-id", defaultBuildID, "The agent build ID/tag to test.")
+	fs.StringVar(&cfg.instanceType, "instance-type", defaultInstanceType, "GCE instance type for the simulation.")
+	fs.StringVar(&cfg.testFilePath, "test-file-path", defaultTestFilePath, "GCS path for test input files.")
+	fs.StringVar(&cfg.localTestFilesDir, "local-test-files-dir", defaultLocalTestDir, "Local directory with test files to upload. If set, files will be uploaded to GCS before simulation.")
+	fs.StringVar(&cfg.owner, "owner", "", "Owner email for the simulation request.")
+	fs.DurationVar(&cfg.timeout, "timeout", defaultTimeout, "Timeout to wait for simulation completion.")
+}
+
+// validateConfig checks that all required flags for running a deployment validation are set.
+func validateConfig(cfg config) error {
+	var missing []string
+	if cfg.projectID == "" {
+		missing = append(missing, "--project-id")
+	}
+	if cfg.owner == "" {
+		missing = append(missing, "--owner")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required flags: %v", missing)
+	}
+	return nil
 }
 
 func main() {
@@ -107,15 +126,8 @@ func main() {
 }
 
 func run(cfg config) error {
-	var missing []string
-	if cfg.projectID == "" {
-		missing = append(missing, "--project-id")
-	}
-	if cfg.owner == "" {
-		missing = append(missing, "--owner")
-	}
-	if len(missing) > 0 {
-		return fmt.Errorf("missing required flags: %v", missing)
+	if err := validateConfig(cfg); err != nil {
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout+2*time.Minute) // Add buffer for cleanup

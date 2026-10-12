@@ -152,7 +152,8 @@ steps:
          //pipeline_scripts/deployment_validation:deployment_validation_test \
          --remote_cache=https://storage.googleapis.com/${_BAZEL_CACHE_BUCKET}/simulator \
          --google_default_credentials \
-         --remote_upload_local_results=true \
+         --remote_upload_local_results=false \
+         --nocache_test_results \
          --test_output=streamed \
          --test_arg=--project-id=${PROJECT_ID} \
          --test_arg=--owner=cloud-build-automated@${PROJECT_ID}.iam.gserviceaccount.com \

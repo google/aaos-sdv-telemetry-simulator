@@ -16,50 +16,84 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"log"
-	"os"
 	"testing"
-
-	"github.com/bazelbuild/rules_go/go/runfiles"
 )
 
-var cfg config
-
-func init() {
-	defineFlags(&cfg)
+func TestDefineFlagsOnSet_Defaults(t *testing.T) {
+	var cfg config
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	defineFlagsOnSet(fs, &cfg)
+	if err := fs.Parse(nil); err != nil {
+		t.Fatalf("fs.Parse(nil) failed: %v", err)
+	}
+	if cfg.region != defaultRegion {
+		t.Errorf("cfg.region = %q, want %q", cfg.region, defaultRegion)
+	}
+	if cfg.environment != defaultEnvironment {
+		t.Errorf("cfg.environment = %q, want %q", cfg.environment, defaultEnvironment)
+	}
+	if cfg.buildID != defaultBuildID {
+		t.Errorf("cfg.buildID = %q, want %q", cfg.buildID, defaultBuildID)
+	}
+	if cfg.instanceType != defaultInstanceType {
+		t.Errorf("cfg.instanceType = %q, want %q", cfg.instanceType, defaultInstanceType)
+	}
+	if cfg.testFilePath != defaultTestFilePath {
+		t.Errorf("cfg.testFilePath = %q, want %q", cfg.testFilePath, defaultTestFilePath)
+	}
+	if cfg.localTestFilesDir != defaultLocalTestDir {
+		t.Errorf("cfg.localTestFilesDir = %q, want %q", cfg.localTestFilesDir, defaultLocalTestDir)
+	}
+	if cfg.timeout != defaultTimeout {
+		t.Errorf("cfg.timeout = %v, want %v", cfg.timeout, defaultTimeout)
+	}
+	if err := validateConfig(cfg); err == nil {
+		t.Errorf("validateConfig(default cfg) = nil, want error for missing --project-id and --owner")
+	}
 }
 
-func TestMain(m *testing.M) {
-	flag.Parse()
-
-	if cfg.localTestFilesDir != "" {
-		r, err := runfiles.New()
-		if err != nil {
-			log.Fatalf("failed to create runfiles object: %v", err)
-		}
-		testDataPath, err := r.Rlocation(cfg.localTestFilesDir)
-		if err != nil {
-			log.Fatalf("failed to find runfiles path for '%s': %v", cfg.localTestFilesDir, err)
-		}
-		if _, err := os.Stat(testDataPath); err != nil {
-			log.Fatalf("local test files directory '%s' (resolved to '%s') does not exist: %v",
-				cfg.localTestFilesDir, testDataPath, err)
-		}
-		fmt.Printf("✅ Resolved 'testdata' path to: %s\n", testDataPath)
-		cfg.localTestFilesDir = testDataPath
+func TestValidateConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     config
+		wantErr bool
+	}{
+		{
+			name:    "missing projectID and owner returns error",
+			cfg:     config{},
+			wantErr: true,
+		},
+		{
+			name: "missing owner returns error",
+			cfg: config{
+				projectID: "test-project",
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing projectID returns error",
+			cfg: config{
+				owner: "tester@example.com",
+			},
+			wantErr: true,
+		},
+		{
+			name: "both projectID and owner present succeeds",
+			cfg: config{
+				projectID: "test-project",
+				owner:     "tester@example.com",
+			},
+			wantErr: false,
+		},
 	}
 
-	exitCode := m.Run()
-	os.Exit(exitCode)
-}
-
-func TestE2E(t *testing.T) {
-	if cfg.projectID == "" && cfg.owner == "" && cfg.serviceURL == "" && cfg.databaseID == "" && cfg.bucketName == "" {
-		t.Skip("no E2E flags provided; skipping live deployment validation")
-	}
-	if err := run(cfg); err != nil {
-		t.Fatalf("E2E Test Failed: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateConfig(tt.cfg)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateConfig(%+v) error = %v, wantErr %v", tt.cfg, err, tt.wantErr)
+			}
+		})
 	}
 }
 

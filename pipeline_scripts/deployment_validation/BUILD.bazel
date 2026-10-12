@@ -29,7 +29,7 @@ go_binary(
 go_test(
     name = "deployment_validation_test",
     timeout = "long",
-    srcs = ["main_test.go"],
+    srcs = ["e2e_test.go"],  # keep
     args = [
         "--local-test-files-dir=_main/testdata",
     ],
@@ -41,4 +41,10 @@ go_test(
     deps = [
         "@rules_go//go/runfiles",
     ],
+)
+
+go_test(
+    name = "deployment_validation_unit_test",
+    srcs = ["main_test.go"],
+    embed = [":deployment_validation_lib"],
 )
