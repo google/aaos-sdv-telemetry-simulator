@@ -255,8 +255,8 @@ This request creates a new simulation with the specified variables:
 - `file_path`: Path within the Cloud Storage bucket, which was predefined in terraform, which points to the input files. It should contain metrics_config.zip and publisher_config.zip
 - `instance_type`: Google Compute Engine instance type which can run with nested virtualization (e.g. n1)
 - `owner`: eemail of the user who owns the simulation
-- `max_simulation_time`: maximum time in **seconds** the simulation runs,
-- `max_report_count`: maximum number of reports the simulation generates.
+- `max_simulation_time`: maximum time in **seconds** the simulation runs (must be > 0),
+- `max_report_count`: maximum number of reports the simulation generates (must be > 0).
 
 The request replies with an generated Simulation ID.
 

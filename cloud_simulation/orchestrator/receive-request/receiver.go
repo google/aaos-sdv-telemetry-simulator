@@ -60,8 +60,14 @@ func (sr *SimulationRequest) Validate() error {
 	if sr.MaxSimulationTime == nil {
 		return errors.New("Missing required field: max_simulation_time")
 	}
+	if *sr.MaxSimulationTime <= 0 {
+		return errors.New("Invalid max_simulation_time: must be > 0")
+	}
 	if sr.MaxReportCount == nil {
 		return errors.New("Missing required field: max_report_count")
+	}
+	if *sr.MaxReportCount <= 0 {
+		return errors.New("Invalid max_report_count: must be > 0")
 	}
 	return nil
 }

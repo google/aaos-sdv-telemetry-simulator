@@ -209,6 +209,42 @@ func TestReceiveRequest(t *testing.T) {
 			expectedStatus:  http.StatusInternalServerError,
 			expectedError:   "Internal server error: invalid build configuration",
 		},
+		{
+			name: "max_simulation_time is 0",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 0, "max_report_count": 5}`,
+			supportedBuilds: ``,
+			expectedStatus:  http.StatusBadRequest,
+			expectedError:   "Invalid max_simulation_time: must be > 0",
+		},
+		{
+			name: "max_simulation_time is negative",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": -10, "max_report_count": 5}`,
+			supportedBuilds: ``,
+			expectedStatus:  http.StatusBadRequest,
+			expectedError:   "Invalid max_simulation_time: must be > 0",
+		},
+		{
+			name: "max_report_count is 0",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 0}`,
+			supportedBuilds: ``,
+			expectedStatus:  http.StatusBadRequest,
+			expectedError:   "Invalid max_report_count: must be > 0",
+		},
+		{
+			name: "max_report_count is negative",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": -5}`,
+			supportedBuilds: ``,
+			expectedStatus:  http.StatusBadRequest,
+			expectedError:   "Invalid max_report_count: must be > 0",
+		},
 	}
 
 	for _, tt := range tests {
