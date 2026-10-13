@@ -400,7 +400,7 @@ func pollForCompletion(ctx context.Context, simulationID string, cfg config) (Si
 				continue
 			}
 
-			if status == "completed" || status == "failed" {
+			if status == "completed" || status == "failed" || status == "cancelled" {
 				log.Printf("🏁 Simulation finished with status: %q", status)
 				return details, status, nil
 			}
