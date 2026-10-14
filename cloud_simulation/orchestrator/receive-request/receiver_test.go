@@ -67,8 +67,8 @@ func successMocks(expectedBuildID string) func(*mock_receiver.MockstorageClient,
 			MaxSimulationTime: 60,
 			MaxReportCount:    5,
 		}
-		ms.EXPECT().Validate(gomock.Any(), gomock.Any()).Return(nil)
-		ms.EXPECT().CopyToOutputs(gomock.Any(), "gs://test-bucket/valid/file/path", gomock.Any())
+		ms.EXPECT().Validate(gomock.Any(), "gs://test-bucket/valid/file/path").Return(nil)
+		ms.EXPECT().CopyToOutputs(gomock.Any(), "gs://test-bucket/valid/file/path", "gs://test-bucket/simulations/test-request-id/inputs/").Return(nil)
 		mf.EXPECT().Write(gomock.Any(), EqAvroRecord(expectedRecord)).Return(nil)
 		mp.EXPECT().PublishMessage(gomock.Any(), "test-topic", EqAvroRecord(expectedRecord)).Return(nil)
 	}
@@ -245,6 +245,159 @@ func TestReceiveRequest(t *testing.T) {
 			expectedStatus:  http.StatusBadRequest,
 			expectedError:   "Invalid max_report_count: must be > 0",
 		},
+		{
+			name:            "Valid request - unknown extra fields are ignored",
+			setupMocks:      successMocks("test-image:test-build"),
+			requestBody:     `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5, "unknown_extra_field": "ignored"}`,
+			supportedBuilds: ``,
+			expectedStatus:  http.StatusOK,
+		},
+		{
+			name: "metrics_config.zip missing in GCS input path",
+			setupMocks: func(ms *mock_receiver.MockstorageClient, _ *mock_receiver.MockfirestoreClient, _ *mock_receiver.MockpubsubClient) {
+				ms.EXPECT().Validate(gomock.Any(), gomock.Any()).Return(errors.New("missing required file: metrics_config.zip"))
+			},
+			requestBody:    `{"file_path": "inputs/missing-metrics", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error validating file path: missing required file: metrics_config.zip",
+		},
+		{
+			name: "publisher_config.zip missing in GCS input path",
+			setupMocks: func(ms *mock_receiver.MockstorageClient, _ *mock_receiver.MockfirestoreClient, _ *mock_receiver.MockpubsubClient) {
+				ms.EXPECT().Validate(gomock.Any(), gomock.Any()).Return(errors.New("missing required file: publisher_config.zip"))
+			},
+			requestBody:    `{"file_path": "inputs/missing-publisher", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error validating file path: missing required file: publisher_config.zip",
+		},
+		{
+			name: "build_id - missing",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "test-owner", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Missing required field: build_id",
+		},
+		{
+			name: "build_id - empty",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Missing required field: build_id",
+		},
+		{
+			name: "build_id - wrong type (non-string / integer)",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": 12345, "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error parsing request body",
+		},
+		{
+			name: "instance_type - missing",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Missing required field: instance_type",
+		},
+		{
+			name: "instance_type - empty",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Missing required field: instance_type",
+		},
+		{
+			name: "instance_type - wrong type (non-string / boolean)",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": true, "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error parsing request body",
+		},
+		{
+			name: "owner - missing",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Missing required field: owner",
+		},
+		{
+			name: "owner - empty",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Missing required field: owner",
+		},
+		{
+			name: "owner - wrong type (non-string / integer)",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": 999, "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error parsing request body",
+		},
+		{
+			name: "file_path - missing",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Missing required field: file_path",
+		},
+		{
+			name: "file_path - empty",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Missing required field: file_path",
+		},
+		{
+			name: "file_path - wrong type",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": ["invalid", "type"], "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error parsing request body",
+		},
+		{
+			name: "max_simulation_time - missing",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Missing required field: max_simulation_time",
+		},
+		{
+			name: "max_simulation_time - wrong type (non-integer / string)",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": "sixty", "max_report_count": 5}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error parsing request body",
+		},
+		{
+			name: "max_report_count - missing",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Missing required field: max_report_count",
+		},
+		{
+			name: "max_report_count - wrong type (non-integer / boolean)",
+			setupMocks: func(*mock_receiver.MockstorageClient, *mock_receiver.MockfirestoreClient, *mock_receiver.MockpubsubClient) {
+			},
+			requestBody:    `{"file_path": "valid/file/path", "owner": "test-owner", "build_id": "test-build", "instance_type": "test-instancetype", "max_simulation_time": 60, "max_report_count": false}`,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Error parsing request body",
+		},
 	}
 
 	for _, tt := range tests {
@@ -272,6 +425,10 @@ func TestReceiveRequest(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, rr.Code)
 			if tt.expectedError != "" {
 				assert.Contains(t, rr.Body.String(), tt.expectedError)
+			}
+			if tt.expectedStatus == http.StatusOK {
+				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+				assert.JSONEq(t, fmt.Sprintf(`{"id":%q}`, requestId), rr.Body.String())
 			}
 		})
 	}
