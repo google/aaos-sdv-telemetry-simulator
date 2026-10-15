@@ -23,8 +23,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	firestore "simulator.code/delete-simulation/firestore"
-	mock_main "simulator.code/delete-simulation/mock"
+
+	"simulator.code/orchestrator/delete-simulation/firestore"
+	mock_main "simulator.code/orchestrator/delete-simulation/mock"
 )
 
 func TestCancelRequest(t *testing.T) {

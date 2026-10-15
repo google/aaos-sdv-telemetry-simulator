@@ -23,7 +23,8 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"simulator.code/simulation-scheduler/compute"
+
+	"simulator.code/orchestrator/schedule-simulation/compute"
 )
 
 const (

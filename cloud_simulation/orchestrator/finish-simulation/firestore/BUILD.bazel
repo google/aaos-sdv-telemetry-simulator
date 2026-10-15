@@ -17,7 +17,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "firestore",
     srcs = ["client.go"],
-    importpath = "simulator.code/finish-simulation/firestore",
+    importpath = "simulator.code/orchestrator/finish-simulation/firestore",
     visibility = ["//visibility:public"],
     deps = ["@com_google_cloud_go_firestore//:firestore"],
 )

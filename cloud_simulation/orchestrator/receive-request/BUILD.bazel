@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# gazelle:prefix simulator.code/receive-request
 load("@rules_go//go:def.bzl", "go_library", "go_test")
 load("//build:gomock.bzl", "go_mock_library")
 
 go_library(
     name = "receive-request",
     srcs = ["receiver.go"],
-    importpath = "simulator.code/receive-request",
+    importpath = "simulator.code/orchestrator/receive-request",
     visibility = ["//visibility:public"],
     deps = [
         "//cloud_simulation/orchestrator/receive-request/firestore",
@@ -44,7 +43,7 @@ go_test(
 go_mock_library(
     name = "mock",
     src = "receiver.go",
-    importpath = "simulator.code/receive-request/mock",
+    importpath = "simulator.code/orchestrator/receive-request/mock",
     deps = [
         "//cloud_simulation/orchestrator/receive-request/pubsub",
     ],

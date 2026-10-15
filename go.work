@@ -1,11 +1,7 @@
 go 1.26.8
 
 use (
-	./cloud_simulation/orchestrator/delete-simulation
-	./cloud_simulation/orchestrator/finish-simulation
-	./cloud_simulation/orchestrator/read-simulation
-	./cloud_simulation/orchestrator/receive-request
-	./cloud_simulation/orchestrator/schedule-simulation
+	./cloud_simulation/orchestrator
 	./cloud_simulation/simulation-agent/agent
 	./pipeline_scripts/deployment_validation
 	./tools

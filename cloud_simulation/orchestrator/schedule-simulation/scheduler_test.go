@@ -22,9 +22,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	"simulator.code/simulation-scheduler/compute"
-	mock_scheduler "simulator.code/simulation-scheduler/mock"
-	"simulator.code/simulation-scheduler/pubsub"
+
+	"simulator.code/orchestrator/schedule-simulation/compute"
+	mock_scheduler "simulator.code/orchestrator/schedule-simulation/mock"
+	"simulator.code/orchestrator/schedule-simulation/pubsub"
 )
 
 func TestScheduleSimulation(t *testing.T) {

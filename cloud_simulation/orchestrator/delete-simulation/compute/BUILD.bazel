@@ -17,7 +17,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "compute",
     srcs = ["client.go"],
-    importpath = "simulator.code/delete-simulation/compute",
+    importpath = "simulator.code/orchestrator/delete-simulation/compute",
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_cloud_go_compute//apiv1",

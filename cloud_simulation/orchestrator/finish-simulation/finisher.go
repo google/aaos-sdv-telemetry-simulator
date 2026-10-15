@@ -24,8 +24,9 @@ import (
 
 	"cloud.google.com/go/compute/apiv1/computepb"
 	"google.golang.org/api/googleapi"
-	"simulator.code/finish-simulation/compute"
-	"simulator.code/finish-simulation/firestore"
+
+	"simulator.code/orchestrator/finish-simulation/compute"
+	"simulator.code/orchestrator/finish-simulation/firestore"
 )
 
 // FinishRequest defines the expected JSON body for a finish request.

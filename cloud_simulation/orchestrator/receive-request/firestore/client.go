@@ -18,7 +18,8 @@ import (
 	"context"
 
 	"cloud.google.com/go/firestore"
-	"simulator.code/receive-request/pubsub"
+
+	"simulator.code/orchestrator/receive-request/pubsub"
 )
 
 type SimulationStatus string

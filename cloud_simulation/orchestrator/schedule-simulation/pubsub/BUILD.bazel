@@ -17,7 +17,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "pubsub",
     srcs = ["client.go"],
-    importpath = "simulator.code/simulation-scheduler/pubsub",
+    importpath = "simulator.code/orchestrator/schedule-simulation/pubsub",
     visibility = ["//visibility:public"],
     deps = ["@com_google_cloud_go_pubsub//:pubsub"],
 )

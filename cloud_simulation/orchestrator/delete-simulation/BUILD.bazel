@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# gazelle:prefix simulator.code/delete-simulation
 load("@rules_go//go:def.bzl", "go_library", "go_test")
 load("//build:gomock.bzl", "go_mock_library")
 
 go_library(
     name = "delete-simulation",
     srcs = ["deletion.go"],
-    importpath = "simulator.code/delete-simulation",
+    importpath = "simulator.code/orchestrator/delete-simulation",
     visibility = ["//visibility:public"],
     deps = [
         "//cloud_simulation/orchestrator/delete-simulation/compute",
@@ -42,7 +41,7 @@ go_test(
 go_mock_library(
     name = "mock",
     src = "deletion.go",
-    importpath = "simulator.code/delete-simulation/mock",
+    importpath = "simulator.code/orchestrator/delete-simulation/mock",
     deps = [
         "//cloud_simulation/orchestrator/delete-simulation/firestore",
     ],

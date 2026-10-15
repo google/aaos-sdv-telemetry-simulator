@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# gazelle:prefix simulator.code/simulation-scheduler
-
 load("@rules_go//go:def.bzl", "go_library", "go_test")
 load("//build:gomock.bzl", "go_mock_library")
 
 go_library(
-    name = "simulation-scheduler",
+    name = "schedule-simulation",
     srcs = ["scheduler.go"],
-    importpath = "simulator.code/simulation-scheduler",
+    importpath = "simulator.code/orchestrator/schedule-simulation",
     visibility = ["//visibility:public"],
     deps = [
         "//cloud_simulation/orchestrator/schedule-simulation/compute",
@@ -30,9 +28,9 @@ go_library(
 )
 
 go_test(
-    name = "simulation-scheduler_test",
+    name = "schedule-simulation_test",
     srcs = ["scheduler_test.go"],
-    embed = [":simulation-scheduler"],
+    embed = [":schedule-simulation"],
     deps = [
         ":mock",
         "//cloud_simulation/orchestrator/schedule-simulation/compute",
@@ -45,7 +43,7 @@ go_test(
 go_mock_library(
     name = "mock",
     src = "scheduler.go",
-    importpath = "simulator.code/simulation-scheduler/mock",
+    importpath = "simulator.code/orchestrator/schedule-simulation/mock",
     deps = [
         "//cloud_simulation/orchestrator/schedule-simulation/compute",
         "//cloud_simulation/orchestrator/schedule-simulation/pubsub",

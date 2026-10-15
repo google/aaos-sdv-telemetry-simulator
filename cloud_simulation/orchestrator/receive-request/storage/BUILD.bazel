@@ -17,7 +17,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "storage",
     srcs = ["client.go"],
-    importpath = "simulator.code/receive-request/storage",
+    importpath = "simulator.code/orchestrator/receive-request/storage",
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_cloud_go_storage//:storage",

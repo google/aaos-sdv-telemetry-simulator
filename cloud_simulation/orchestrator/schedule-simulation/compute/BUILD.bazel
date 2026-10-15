@@ -21,7 +21,7 @@ go_library(
         "client.go",
         "startup.go",
     ],
-    importpath = "simulator.code/simulation-scheduler/compute",
+    importpath = "simulator.code/orchestrator/schedule-simulation/compute",
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_cloud_go_compute//apiv1",

@@ -27,10 +27,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"simulator.code/receive-request/firestore"
 
-	"simulator.code/receive-request/pubsub"
-	"simulator.code/receive-request/storage"
+	"simulator.code/orchestrator/receive-request/firestore"
+	"simulator.code/orchestrator/receive-request/pubsub"
+	"simulator.code/orchestrator/receive-request/storage"
 )
 
 // SimulationRequest defines the expected JSON body for a new simulation request.

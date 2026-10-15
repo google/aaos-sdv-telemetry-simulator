@@ -25,7 +25,7 @@ import (
 
 	"google.golang.org/grpc/status"
 
-	"simulator.code/simulation-reader/firestore"
+	"simulator.code/orchestrator/read-simulation/firestore"
 )
 
 type firestoreClient interface {

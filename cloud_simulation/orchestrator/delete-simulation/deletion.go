@@ -23,8 +23,8 @@ import (
 	"os"
 	"time"
 
-	compute "simulator.code/delete-simulation/compute"
-	firestore "simulator.code/delete-simulation/firestore"
+	"simulator.code/orchestrator/delete-simulation/compute"
+	"simulator.code/orchestrator/delete-simulation/firestore"
 )
 
 // Environment variable names

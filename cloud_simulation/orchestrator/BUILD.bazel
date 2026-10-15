@@ -12,4 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@rules_go//go:def.bzl", "go_library")
+
+# gazelle:prefix simulator.code/orchestrator
 package(default_visibility = ["//visibility:public"])
+
+go_library(
+    name = "orchestrator",
+    srcs = ["functions.go"],
+    importpath = "simulator.code/orchestrator",
+    deps = [
+        "//cloud_simulation/orchestrator/delete-simulation",
+        "//cloud_simulation/orchestrator/finish-simulation",
+        "//cloud_simulation/orchestrator/read-simulation",
+        "//cloud_simulation/orchestrator/receive-request",
+        "//cloud_simulation/orchestrator/schedule-simulation",
+    ],
+)

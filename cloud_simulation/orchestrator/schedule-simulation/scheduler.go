@@ -23,9 +23,9 @@ import (
 	"strconv"
 	"time"
 
-	"simulator.code/simulation-scheduler/compute"
-	"simulator.code/simulation-scheduler/firestore"
-	"simulator.code/simulation-scheduler/pubsub"
+	"simulator.code/orchestrator/schedule-simulation/compute"
+	"simulator.code/orchestrator/schedule-simulation/firestore"
+	"simulator.code/orchestrator/schedule-simulation/pubsub"
 )
 
 type scheduler struct {

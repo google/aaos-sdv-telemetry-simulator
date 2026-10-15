@@ -17,7 +17,7 @@ load("@rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "update_golden_lib",
     srcs = ["main.go"],
-    importpath = "simulator.code/simulation-scheduler/compute/cmd/update_golden",
+    importpath = "simulator.code/orchestrator/schedule-simulation/compute/cmd/update_golden",
     visibility = ["//visibility:private"],
     deps = [
         "//cloud_simulation/orchestrator/schedule-simulation/compute",

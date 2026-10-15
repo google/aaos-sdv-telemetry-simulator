@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# gazelle:prefix simulator.code/finish-simulation
 load("@rules_go//go:def.bzl", "go_library", "go_test")
 load("//build:gomock.bzl", "go_mock_library")
 
 go_library(
     name = "finish-simulation",
     srcs = ["finisher.go"],
-    importpath = "simulator.code/finish-simulation",
+    importpath = "simulator.code/orchestrator/finish-simulation",
     visibility = ["//visibility:public"],
     deps = [
         "//cloud_simulation/orchestrator/finish-simulation/compute",
@@ -46,7 +45,7 @@ go_test(
 go_mock_library(
     name = "mock",
     src = "finisher.go",
-    importpath = "simulator.code/finish-simulation/mock",
+    importpath = "simulator.code/orchestrator/finish-simulation/mock",
     deps = [
         "//cloud_simulation/orchestrator/finish-simulation/firestore",
         "@com_google_cloud_go_compute//apiv1/computepb",

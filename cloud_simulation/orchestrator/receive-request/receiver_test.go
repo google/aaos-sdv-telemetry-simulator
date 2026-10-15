@@ -24,11 +24,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mock_receiver "simulator.code/receive-request/mock"
-	"simulator.code/receive-request/pubsub"
-
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	mock_receiver "simulator.code/orchestrator/receive-request/mock"
+	"simulator.code/orchestrator/receive-request/pubsub"
 )
 
 type avroRecordMatcher struct {

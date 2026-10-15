@@ -27,8 +27,9 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/protobuf/proto"
-	firestore "simulator.code/finish-simulation/firestore"
-	mock_main "simulator.code/finish-simulation/mock"
+
+	"simulator.code/orchestrator/finish-simulation/firestore"
+	mock_main "simulator.code/orchestrator/finish-simulation/mock"
 )
 
 func TestFinisher_FinishSimulation(t *testing.T) {

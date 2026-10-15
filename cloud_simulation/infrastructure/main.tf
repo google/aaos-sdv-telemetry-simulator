@@ -193,6 +193,17 @@ locals {
   # this module (including GCS bucket and Firestore database naming).
   finisher_fn_url = "https://${var.default_region}-${var.project_id}.cloudfunctions.net/${local.names.finisher_fn}"
 
+  # All orchestrator functions are built from one Go module, so every function
+  # uploads the whole orchestrator directory and its entry_point selects the
+  # handler. Tests, Bazel files and test data are not needed by the Cloud
+  # Functions build.
+  orchestrator_bundle = {
+    path = "../orchestrator/"
+    folder_options = {
+      excludes = ["**/*_test.go", "**/BUILD.bazel", "**/testdata/**"]
+    }
+  }
+
   vpc_connector_id = (
     var.vpc_connector == null
     ? null
@@ -243,12 +254,7 @@ module "simulation_orchestrator_function" {
       egress_settings = var.vpc_connector.egress_settings
     }
   )
-  bundle_config = {
-    path = "../orchestrator/receive-request/"
-    folder_options = {
-      excludes = ["*_test.go"]
-    }
-  }
+  bundle_config = local.orchestrator_bundle
 
   function_config = {
     entry_point = "HandleSimulationRequest"
@@ -284,12 +290,7 @@ module "simulation_deletion_function" {
       egress_settings = var.vpc_connector.egress_settings
     }
   )
-  bundle_config = {
-    path = "../orchestrator/delete-simulation/"
-    folder_options = {
-      excludes = ["*_test.go"]
-    }
-  }
+  bundle_config = local.orchestrator_bundle
 
   function_config = {
     entry_point = "HandleCancellationRequest"
@@ -322,12 +323,7 @@ module "simulation_finisher_function" {
       egress_settings = var.vpc_connector.egress_settings
     }
   )
-  bundle_config = {
-    path = "../orchestrator/finish-simulation/"
-    folder_options = {
-      excludes = ["*_test.go"]
-    }
-  }
+  bundle_config = local.orchestrator_bundle
 
   function_config = {
     entry_point = "FinishSimulation"
@@ -360,12 +356,7 @@ module "simulation_reader_function" {
       egress_settings = var.vpc_connector.egress_settings
     }
   )
-  bundle_config = {
-    path = "../orchestrator/read-simulation/"
-    folder_options = {
-      excludes = ["*_test.go"]
-    }
-  }
+  bundle_config = local.orchestrator_bundle
 
   function_config = {
     entry_point = "HandleReadRequest"
@@ -460,12 +451,7 @@ module "scheduler_function" {
     }
   )
 
-  bundle_config = {
-    path = "../orchestrator/schedule-simulation/"
-    folder_options = {
-      excludes = ["*_test.go"]
-    }
-  }
+  bundle_config = local.orchestrator_bundle
 
   function_config = {
     entry_point = "HandleScheduleTrigger"

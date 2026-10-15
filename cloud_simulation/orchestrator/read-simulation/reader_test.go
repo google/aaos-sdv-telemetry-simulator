@@ -25,8 +25,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
-	"simulator.code/simulation-reader/firestore"
-	mock_firestore "simulator.code/simulation-reader/mock"
+
+	"simulator.code/orchestrator/read-simulation/firestore"
+	mock_firestore "simulator.code/orchestrator/read-simulation/mock"
 )
 
 func TestGetSimulation_Success(t *testing.T) {
