@@ -25,10 +25,12 @@ else
   echo "No .git repo detected (likely gcloud builds submit)."
   echo "Simulating changes for development..."
   # Create a dummy list of changed files to force all components to build.
-  echo "cloud_simulation/infrastructure/force_test" > changed_files.txt
-  echo "cloud_simulation/orchestrator/force_test" >> changed_files.txt
-  echo "cloud_simulation/simulation-agent/force_test" >> changed_files.txt
-  echo "cloud_simulation/web_demo/force_test" >> changed_files.txt
+  {
+    echo "cloud_simulation/infrastructure/force_test"
+    echo "cloud_simulation/orchestrator/force_test"
+    echo "cloud_simulation/simulation-agent/force_test"
+    echo "cloud_simulation/web_demo/force_test"
+  } > changed_files.txt
 fi
 
 echo "Files changed:"
