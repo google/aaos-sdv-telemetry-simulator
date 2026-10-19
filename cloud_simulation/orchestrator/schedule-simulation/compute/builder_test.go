@@ -109,3 +109,65 @@ func TestBuildInstanceMatchesGolden(t *testing.T) {
 	instance := BuildInstance(testProjectID, testZone, testDatabaseID, defaultInstanceConfig())
 	compareGolden(t, filepath.Join("testdata", "golden", "default_instance.json"), canonicalJSON(t, instance))
 }
+
+func TestSanitizeInstanceName(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "uuid gets the sim- prefix",
+			in:   "aa27583c-96a5-4a67-adad-d15e00c0f12a",
+			want: "sim-aa27583c-96a5-4a67-adad-d15e00c0f12a",
+		},
+		{
+			name: "upper case is lowered",
+			in:   "AA27583C-96A5",
+			want: "sim-aa27583c-96a5",
+		},
+		{
+			name: "invalid characters become hyphens",
+			in:   "abc_def.ghi jkl",
+			want: "sim-abc-def-ghi-jkl",
+		},
+		{
+			name: "trailing hyphen is replaced by a letter",
+			in:   "abc-",
+			want: "sim-abca",
+		},
+		{
+			name: "only invalid characters still yield a valid name",
+			in:   "!!!",
+			want: "sim---a",
+		},
+		{
+			name: "long ids are cut to 59 characters before the prefix",
+			in:   strings.Repeat("x", 70),
+			want: "sim-" + strings.Repeat("x", 59),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := sanitizeInstanceName(tc.in)
+			if got != tc.want {
+				t.Errorf("sanitizeInstanceName(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+			if len(got) > 63 {
+				t.Errorf("sanitizeInstanceName(%q) is %d characters, GCE allows 63", tc.in, len(got))
+			}
+		})
+	}
+}
+
+// An empty simulation id never reaches the scheduler (the receiver generates
+// a UUID), but if it did, sanitizeInstanceName panics instead of returning a
+// name. Pinned here so a future change to that behaviour is deliberate.
+func TestSanitizeInstanceNamePanicsOnEmptyID(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("sanitizeInstanceName(\"\") did not panic")
+		}
+	}()
+	sanitizeInstanceName("")
+}
