@@ -152,6 +152,22 @@ func run(cfg config) error {
 		}
 	}
 
+	// --- Firestore Client Setup ---
+	dbID := resolveDatabaseID(cfg)
+	firestoreClient, err := firestore.NewClientWithDatabase(ctx, cfg.projectID, dbID)
+	if err != nil {
+		return fmt.Errorf("firestore.NewClientWithDatabase: %w", err)
+	}
+	defer firestoreClient.Close()
+
+	// --- Check Initial Running VM Counter ---
+	log.Println("🔎 Checking initial running VM counter in Firestore...")
+	initialVMCount, err := readRunningVMCount(ctx, firestoreClient)
+	if err != nil {
+		return fmt.Errorf("failed to read initial running VM count: %w", err)
+	}
+	log.Printf("   Initial running VM count: %d", initialVMCount)
+
 	// --- Trigger Simulation ---
 	log.Println("▶️  Triggering simulation...")
 	simulationID, err := triggerSimulation(ctx, serviceURL, authToken, cfg)
@@ -162,7 +178,7 @@ func run(cfg config) error {
 
 	// --- Poll for Completion ---
 	log.Printf("⏳ Waiting for simulation to complete... (Timeout: %s, Project: %s)", cfg.timeout, cfg.projectID)
-	simulationDetails, finalStatus, err := pollForCompletion(ctx, simulationID, cfg)
+	simulationDetails, finalStatus, err := pollForCompletion(ctx, firestoreClient, simulationID, cfg)
 	if err != nil {
 		return err
 	}
@@ -183,6 +199,18 @@ func run(cfg config) error {
 	if err := verifyResultsExist(ctx, simulationID, cfg); err != nil {
 		return err
 	}
+
+	// --- Verify Running VM Counter Balance ---
+	log.Println("🔎 Checking final running VM counter in Firestore...")
+	finalVMCount, err := readRunningVMCount(ctx, firestoreClient)
+	if err != nil {
+		return fmt.Errorf("failed to read final running VM count: %w", err)
+	}
+	log.Printf("   Final running VM count: %d", finalVMCount)
+	if finalVMCount != initialVMCount {
+		return fmt.Errorf("running VM counter imbalance detected: count was %d before simulation, but is %d after completion", initialVMCount, finalVMCount)
+	}
+	log.Printf("✅ Running VM counter is balanced (before: %d, after: %d).", initialVMCount, finalVMCount)
 
 	return nil
 }
@@ -375,16 +403,9 @@ func resolveReceiveFunctionName(cfg config) string {
 	return name
 }
 
-func pollForCompletion(ctx context.Context, simulationID string, cfg config) (SimulationDetails, string, error) {
+func pollForCompletion(ctx context.Context, firestoreClient *firestore.Client, simulationID string, cfg config) (SimulationDetails, string, error) {
 	pollCtx, cancel := context.WithTimeout(ctx, cfg.timeout)
 	defer cancel()
-
-	dbID := resolveDatabaseID(cfg)
-	firestoreClient, err := firestore.NewClientWithDatabase(ctx, cfg.projectID, dbID)
-	if err != nil {
-		return SimulationDetails{}, "", fmt.Errorf("firestore.NewClientWithDatabase: %w", err)
-	}
-	defer firestoreClient.Close()
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -432,6 +453,26 @@ func checkSimulationStatus(ctx context.Context, client *firestore.Client, simula
 	}
 
 	return details, details.Status, nil
+}
+
+// readRunningVMCount reads the current active VM counter from the running-vms/counter
+// Firestore document. Concurrent CI runs do not collide on this counter because
+// presubmit jobs provision isolated per-patchset Firestore databases (--database-id)
+// and continuous deployments serialize runs per environment via a GCS lock.
+func readRunningVMCount(ctx context.Context, client *firestore.Client) (int64, error) {
+	docRef := client.Collection("running-vms").Doc("counter")
+	doc, err := docRef.Get(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get running-vms/counter document: %w", err)
+	}
+
+	var data struct {
+		Counter int64 `firestore:"counter"`
+	}
+	if err := doc.DataTo(&data); err != nil {
+		return 0, fmt.Errorf("failed to decode running-vms/counter document: %w", err)
+	}
+	return data.Counter, nil
 }
 
 func verifyResultsExist(ctx context.Context, simulationID string, cfg config) error {
