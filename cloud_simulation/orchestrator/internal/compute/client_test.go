@@ -43,6 +43,9 @@ type fakeComputeAPI struct {
 	instances map[string]map[string]any
 	// failGet makes every instance GET fail with HTTP 500.
 	failGet bool
+	// vanishDuringDelete makes the deletion operation of every instance
+	// report HTTP 404, as when another process deleted the instance first.
+	vanishDuringDelete bool
 	// listFilter is the filter of the last list request.
 	listFilter string
 }
@@ -54,6 +57,10 @@ func (f *fakeComputeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, operationsPath) {
 		// Deletions finish at once, so every operation is done.
 		name := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, operationsPath+"/"), "/wait")
+		if f.vanishDuringDelete {
+			writeNotFound(w, name)
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"name": name, "status": "DONE", "zone": "test-zone"})
 		return
 	}
@@ -189,6 +196,21 @@ func TestDeleteInstance(t *testing.T) {
 	api := &fakeComputeAPI{instances: map[string]map[string]any{"sim-1": instance("sim-1", time.Now())}}
 	c := newTestClient(t, api)
 
-	require.NoError(t, c.DeleteInstance(context.Background(), "test-project", "test-zone", "sim-1"))
+	ctx := context.Background()
+
+	require.NoError(t, c.DeleteInstance(ctx, "test-project", "test-zone", "sim-1"))
 	assert.NotContains(t, api.instances, "sim-1")
+
+	// An instance that is already gone counts as deleted.
+	assert.NoError(t, c.DeleteInstance(ctx, "test-project", "test-zone", "sim-1"))
+}
+
+func TestDeleteInstanceThatVanishesDuringDeletion(t *testing.T) {
+	api := &fakeComputeAPI{
+		instances:          map[string]map[string]any{"sim-1": instance("sim-1", time.Now())},
+		vanishDuringDelete: true,
+	}
+	c := newTestClient(t, api)
+
+	assert.NoError(t, c.DeleteInstance(context.Background(), "test-project", "test-zone", "sim-1"))
 }

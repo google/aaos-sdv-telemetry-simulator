@@ -108,7 +108,7 @@ func (c *Client) DeleteInstance(ctx context.Context, projectID string, zone stri
 	if err != nil {
 		// If the instance is not found, it means it was already deleted by another process.
 		// In this case, we don't need to return an error, as the desired state (instance deleted) is already achieved.
-		if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == http.StatusNotFound {
+		if isNotFound(err) {
 			c.logger.Info("Instance not found, assuming it was already deleted.", "instance", instanceID)
 			return nil
 		}
@@ -119,7 +119,7 @@ func (c *Client) DeleteInstance(ctx context.Context, projectID string, zone stri
 		// It's possible that the instance was deleted by another process while we were waiting for the operation to complete.
 		// In this case, the operation will fail with a "not found" error.
 		// We don't need to return an error, as the desired state (instance deleted) is already achieved.
-		if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == http.StatusNotFound {
+		if isNotFound(err) {
 			c.logger.Info("Instance not found during deletion wait, assuming it was already deleted.", "instance", instanceID)
 			return nil
 		}
@@ -130,6 +130,13 @@ func (c *Client) DeleteInstance(ctx context.Context, projectID string, zone stri
 
 func (c *Client) Close() error {
 	return c.client.Close()
+}
+
+// isNotFound reports whether err is an HTTP 404 response. The REST client
+// wraps *googleapi.Error, so a type assertion on err does not find it.
+func isNotFound(err error) bool {
+	var gerr *googleapi.Error
+	return errors.As(err, &gerr) && gerr.Code == http.StatusNotFound
 }
 
 func (c *Client) InstanceExists(ctx context.Context, projectID string, zone string, instanceID string) (bool, error) {
@@ -147,8 +154,7 @@ func (c *Client) InstanceExists(ctx context.Context, projectID string, zone stri
 
 	// If the error is a 404 Not Found, it's not a "real" error for our purposes.
 	// It simply means the instance doesn't exist.
-	var gerr *googleapi.Error
-	if errors.As(err, &gerr) && gerr.Code == http.StatusNotFound {
+	if isNotFound(err) {
 		return false, nil
 	}
 	return false, fmt.Errorf("failed to check existence for instance %s: %w", instanceID, err)
