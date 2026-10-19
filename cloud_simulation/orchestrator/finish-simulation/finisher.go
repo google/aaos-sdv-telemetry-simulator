@@ -25,8 +25,8 @@ import (
 	"cloud.google.com/go/compute/apiv1/computepb"
 	"google.golang.org/api/googleapi"
 
-	"simulator.code/orchestrator/finish-simulation/compute"
 	"simulator.code/orchestrator/finish-simulation/firestore"
+	"simulator.code/orchestrator/internal/compute"
 )
 
 // FinishRequest defines the expected JSON body for a finish request.
@@ -46,7 +46,7 @@ type Finisher interface {
 
 type finisher struct {
 	firestoreClient firestore.Client
-	computeClient   compute.Client
+	computeClient   computeClient
 	logger          *slog.Logger
 }
 

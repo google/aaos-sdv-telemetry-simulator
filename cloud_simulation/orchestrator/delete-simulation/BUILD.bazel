@@ -21,8 +21,8 @@ go_library(
     importpath = "simulator.code/orchestrator/delete-simulation",
     visibility = ["//visibility:public"],
     deps = [
-        "//cloud_simulation/orchestrator/delete-simulation/compute",
         "//cloud_simulation/orchestrator/delete-simulation/firestore",
+        "//cloud_simulation/orchestrator/internal/compute",
     ],
 )
 

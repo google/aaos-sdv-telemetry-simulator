@@ -21,8 +21,8 @@ go_library(
     importpath = "simulator.code/orchestrator/finish-simulation",
     visibility = ["//visibility:public"],
     deps = [
-        "//cloud_simulation/orchestrator/finish-simulation/compute",
         "//cloud_simulation/orchestrator/finish-simulation/firestore",
+        "//cloud_simulation/orchestrator/internal/compute",
         "@com_google_cloud_go_compute//apiv1/computepb",
         "@org_golang_google_api//googleapi",
     ],

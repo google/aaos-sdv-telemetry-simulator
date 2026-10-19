@@ -1,4 +1,4 @@
-# Copyright 2025 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "compute",
     srcs = ["client.go"],
-    importpath = "simulator.code/orchestrator/delete-simulation/compute",
-    visibility = ["//visibility:public"],
+    importpath = "simulator.code/orchestrator/internal/compute",
+    visibility = ["//cloud_simulation/orchestrator:__subpackages__"],
     deps = [
         "@com_google_cloud_go_compute//apiv1",
         "@com_google_cloud_go_compute//apiv1/computepb",
         "@org_golang_google_api//googleapi",
         "@org_golang_google_api//iterator",
         "@org_golang_google_protobuf//proto",
+    ],
+)
+
+go_test(
+    name = "compute_test",
+    srcs = ["client_test.go"],
+    embed = [":compute"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@com_google_cloud_go_compute//apiv1",
+        "@org_golang_google_api//option",
     ],
 )

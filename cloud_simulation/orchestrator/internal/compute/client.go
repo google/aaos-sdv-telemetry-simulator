@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package compute holds the Compute Engine calls that the orchestrator
+// functions use to find, inspect and delete simulation VMs.
 package compute
 
 import (
@@ -34,27 +36,33 @@ const (
 	simulationLabelValue = "simulation"
 )
 
-type Client interface {
-	DeleteInstance(ctx context.Context, projectID string, zone string, instanceID string) error
-	InstanceExists(ctx context.Context, projectID string, zone string, instanceID string) (bool, error)
-	QueryInstances(ctx context.Context, projectID string, zone string, duration int) ([]string, error)
-	Close() error
-}
-
-type client struct {
+type Client struct {
 	client *compute.InstancesClient
 	logger *slog.Logger
 }
 
-func NewClient(ctx context.Context, logger *slog.Logger) (Client, error) {
+func NewClient(ctx context.Context, logger *slog.Logger) (*Client, error) {
 	computeClient, err := compute.NewInstancesRESTClient(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &client{client: computeClient, logger: logger}, nil
+	return &Client{client: computeClient, logger: logger}, nil
 }
 
-func (c client) QueryInstances(ctx context.Context, projectID string, zone string, duration int) ([]string, error) {
+func (c *Client) GetInstance(ctx context.Context, projectID string, zone string, instanceID string) (*computepb.Instance, error) {
+	req := &computepb.GetInstanceRequest{
+		Instance: instanceID,
+		Project:  projectID,
+		Zone:     zone,
+	}
+	instance, err := c.client.Get(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get instance details for %s: %w", instanceID, err)
+	}
+	return instance, nil
+}
+
+func (c *Client) QueryInstances(ctx context.Context, projectID string, zone string, duration int) ([]string, error) {
 	req := &computepb.ListInstancesRequest{
 		Project: projectID,
 		Zone:    zone,
@@ -89,7 +97,7 @@ func (c client) QueryInstances(ctx context.Context, projectID string, zone strin
 	return instanceIDs, nil
 }
 
-func (c client) DeleteInstance(ctx context.Context, projectID string, zone string, instanceID string) error {
+func (c *Client) DeleteInstance(ctx context.Context, projectID string, zone string, instanceID string) error {
 	req := &computepb.DeleteInstanceRequest{
 		Project:  projectID,
 		Zone:     zone,
@@ -120,11 +128,11 @@ func (c client) DeleteInstance(ctx context.Context, projectID string, zone strin
 	return nil
 }
 
-func (c client) Close() error {
+func (c *Client) Close() error {
 	return c.client.Close()
 }
 
-func (c client) InstanceExists(ctx context.Context, projectID string, zone string, instanceID string) (bool, error) {
+func (c *Client) InstanceExists(ctx context.Context, projectID string, zone string, instanceID string) (bool, error) {
 	req := &computepb.GetInstanceRequest{
 		Project:  projectID,
 		Zone:     zone,
