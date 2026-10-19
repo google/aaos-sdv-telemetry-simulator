@@ -32,6 +32,13 @@ import (
 var (
 	LOGCAT_FILE_PATH       = "/opt/android/cuttlefish_runtime/logs/logcat"
 	ANDROID_INFO_FILE_PATH = "/opt/android/android-info.txt"
+
+	vmBootTimeout             = 5 * time.Minute
+	vmBootRetryInterval       = 1 * time.Second
+	adbRootTimeout            = 1 * time.Minute
+	adbRootRetryInterval      = 1 * time.Second
+	adbRootReadyTimeout       = 1 * time.Minute
+	adbRootReadyRetryInterval = 1 * time.Second
 )
 
 func logStream(rc io.ReadCloser, component, stream string, logger *slog.Logger) {
@@ -169,7 +176,7 @@ func poll(timeout, interval time.Duration, condition func(attempt int) bool) boo
 }
 
 func (a *agent) waitForVM() error {
-	booted := poll(5*time.Minute, 1*time.Second, func(attempt int) bool {
+	booted := poll(vmBootTimeout, vmBootRetryInterval, func(attempt int) bool {
 		a.logger.Debug("Attempting to connect to VM...", "attempt", attempt)
 		if err := a.adbClient.Connect(); err != nil {
 			return false
@@ -184,12 +191,24 @@ func (a *agent) waitForVM() error {
 
 	a.logger.Info("VM booted successfully, switching adb to root")
 
-	if err := a.adbClient.Root(); err != nil {
-		return fmt.Errorf("Failed to restart adb daemon with root permissions: %w", err)
+	var lastRootErr error
+	rootRestarted := poll(adbRootTimeout, adbRootRetryInterval, func(attempt int) bool {
+		if err := a.adbClient.Root(); err != nil {
+			lastRootErr = err
+			a.logger.Debug("Attempting to switch adb to root...", "attempt", attempt, "error", err)
+			return false
+		}
+		return true
+	})
+	if !rootRestarted {
+		if lastRootErr != nil {
+			return fmt.Errorf("Failed to restart adb daemon with root permissions: %w", lastRootErr)
+		}
+		return fmt.Errorf("Failed to restart adb daemon with root permissions: timed out")
 	}
 
 	// Wait for adb to reconnect as root after restarting adbd
-	rootReady := poll(1*time.Minute, 1*time.Second, func(attempt int) bool {
+	rootReady := poll(adbRootReadyTimeout, adbRootReadyRetryInterval, func(attempt int) bool {
 		if err := a.adbClient.Connect(); err != nil {
 			return false
 		}

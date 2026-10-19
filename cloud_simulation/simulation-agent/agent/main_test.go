@@ -92,9 +92,16 @@ func TestAgent(t *testing.T) {
 		originalLogcatPath := LOGCAT_FILE_PATH
 		LOGCAT_FILE_PATH = tmpLogcatPath
 
+		origAdbRootTimeout := adbRootTimeout
+		origAdbRootRetryInterval := adbRootRetryInterval
+		adbRootTimeout = 20 * time.Millisecond
+		adbRootRetryInterval = 2 * time.Millisecond
+
 		t.Cleanup(func() {
 			ANDROID_INFO_FILE_PATH = originalAndroidInfoPath
 			LOGCAT_FILE_PATH = originalLogcatPath
+			adbRootTimeout = origAdbRootTimeout
+			adbRootRetryInterval = origAdbRootRetryInterval
 			os.RemoveAll(tempDir)
 		})
 	}
@@ -235,6 +242,8 @@ func TestAgent(t *testing.T) {
 
 	t.Run("executeSimulation fails on adb root", func(t *testing.T) {
 		setupAndroidInfo(t)
+		adbRootTimeout = 0
+
 		mockStorage.EXPECT().Download(ctx, "gs://simulationBucket/simulations/"+simulationID+"/inputs/").Return(nil)
 
 		mockAdb.EXPECT().StopCvd().Return(nil)
@@ -263,6 +272,65 @@ func TestAgent(t *testing.T) {
 		err = agent.executeSimulation(ctx, projectID, zone)
 
 		assert.Error(t, err)
+	})
+
+	t.Run("executeSimulation succeeds when adb root succeeds on retry", func(t *testing.T) {
+		setupAndroidInfo(t)
+		mockStorage.EXPECT().Download(ctx, "gs://simulationBucket/simulations/"+simulationID+"/inputs/").Return(nil)
+
+		mockAdb.EXPECT().StopCvd().Return(nil)
+		mockAdb.EXPECT().StartServer().Return(nil)
+		mockAdb.EXPECT().LaunchCvd(true).Return(
+			io.NopCloser(strings.NewReader("")),
+			io.NopCloser(strings.NewReader("")),
+			nil,
+		)
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("getprop", "sys.boot_completed").Return("1", nil)
+		// First attempt fails, second attempt succeeds on retry.
+		gomock.InOrder(
+			mockAdb.EXPECT().Root().Return(assert.AnError),
+			mockAdb.EXPECT().Root().Return(nil),
+		)
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("whoami").Return("root", nil)
+		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed.textproto", "/data/local/tmp/average_speed.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/metrics_config/average_speed_vector.textproto", "/data/local/tmp/average_speed_vector.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/metrics_config/journey_summary.textproto", "/data/local/tmp/journey_summary.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/error_publisher_config.textproto", "/data/local/tmp/error_publisher_config.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/error_publisher_data.csv", "/data/local/tmp/error_publisher_data.csv").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/speed_publisher_config.textproto", "/data/local/tmp/speed_publisher_config.textproto").Return(nil)
+		mockAdb.EXPECT().Push("../../../testdata/publisher_config/speed_publisher_data.csv", "/data/local/tmp/speed_publisher_data.csv").Return(nil)
+		mockAdb.EXPECT().Logcat().Return(
+			io.NopCloser(strings.NewReader("")),
+			io.NopCloser(strings.NewReader("")),
+			nil,
+		)
+		mockAdb.EXPECT().Shell(
+			"sdv_telemetry_simulator",
+			"--max-simulation-time", "seconds:60",
+			"full-simulation",
+			"--metrics-configs", "/data/local/tmp/average_speed.textproto /data/local/tmp/average_speed_vector.textproto /data/local/tmp/journey_summary.textproto ",
+			"--publisher-configs", "/data/local/tmp/error_publisher_config.textproto /data/local/tmp/speed_publisher_config.textproto ",
+			"--max-report-count", "3")
+		mockAdb.EXPECT().Bugreport(filepath.Join(agent.outputsDir, "bugreport.zip")).Return(nil)
+		mockAdb.EXPECT().Pull("/data/local/tmp/telemetry_simulator_out/", agent.outputsDir)
+
+		mockStorage.EXPECT().Upload(ctx, "gs://simulationBucket/simulations/"+simulationID+"/outputs/", agent.outputsDir).Return(nil)
+
+		expectedPayload := finisher.Payload{
+			ID:         simulationID,
+			ProjectID:  projectID,
+			Zone:       zone,
+			InstanceID: agent.instanceName,
+			DocumentID: agent.documentID,
+			Status:     "completed",
+		}
+		mockFinisher.EXPECT().Finish(ctx, agent.finishURL, expectedPayload).Return(nil)
+
+		err = agent.executeSimulation(ctx, projectID, zone)
+
+		assert.NoError(t, err)
 	})
 
 	t.Run("executeSimulation fails on simulator error", func(t *testing.T) {
@@ -351,5 +419,62 @@ func TestPoll(t *testing.T) {
 		})
 		assert.False(t, ok)
 		assert.GreaterOrEqual(t, calls, 2)
+	})
+}
+
+func TestWaitForVM(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	origAdbRootTimeout := adbRootTimeout
+	origAdbRootRetryInterval := adbRootRetryInterval
+	adbRootTimeout = 20 * time.Millisecond
+	adbRootRetryInterval = 2 * time.Millisecond
+	t.Cleanup(func() {
+		adbRootTimeout = origAdbRootTimeout
+		adbRootRetryInterval = origAdbRootRetryInterval
+	})
+
+	t.Run("succeeds when adb root succeeds immediately", func(t *testing.T) {
+		mockAdb := mock_main.NewMockadbClient(ctrl)
+		a := &agent{adbClient: mockAdb, logger: logger}
+
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("getprop", "sys.boot_completed").Return("1", nil)
+		mockAdb.EXPECT().Root().Return(nil)
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("whoami").Return("root", nil)
+
+		assert.NoError(t, a.waitForVM())
+	})
+
+	t.Run("succeeds when adb root succeeds after transient failure", func(t *testing.T) {
+		mockAdb := mock_main.NewMockadbClient(ctrl)
+		a := &agent{adbClient: mockAdb, logger: logger}
+
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("getprop", "sys.boot_completed").Return("1", nil)
+		gomock.InOrder(
+			mockAdb.EXPECT().Root().Return(assert.AnError),
+			mockAdb.EXPECT().Root().Return(nil),
+		)
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("whoami").Return("root", nil)
+
+		assert.NoError(t, a.waitForVM())
+	})
+
+	t.Run("fails when adb root fails persistently until timeout", func(t *testing.T) {
+		mockAdb := mock_main.NewMockadbClient(ctrl)
+		a := &agent{adbClient: mockAdb, logger: logger}
+
+		mockAdb.EXPECT().Connect().Return(nil)
+		mockAdb.EXPECT().Shell("getprop", "sys.boot_completed").Return("1", nil)
+		mockAdb.EXPECT().Root().Return(assert.AnError).AnyTimes()
+
+		err := a.waitForVM()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Failed to restart adb daemon with root permissions")
 	})
 }
