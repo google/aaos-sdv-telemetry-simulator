@@ -207,7 +207,7 @@ message ConditionalTrigger {
 
   // Fires if the new value is different from the previous value. If any
   // `EdgeOptions` are set, then only numeric and boolean values are supported,
-  // otherwise all values types are supported.
+  // otherwise all value types are supported.
   message ConditionTypeAllChanges {
     // Optional.
     EdgeOptions rising_options = 1;
@@ -377,7 +377,7 @@ message MetricsReportConfig {
 // Report message that is sent to the OEM application.
 message MetricsReport {
   // Required.
-  // Monotonously increasing report number in Metrics Configuration.
+  // Monotonically increasing report number in Metrics Configuration.
   // Starts from 1 and incremented by 1 for each new report.
   // Report numbers are reset after a power down (turn off), process restart
   // and Metrics Config deactivation.
@@ -429,7 +429,7 @@ message MetricsReport {
   google.protobuf.Timestamp config_activation_timestamp = 8;
 
   // Required.
-  // Identifiers of errors occurred while generating the report.
+  // Identifiers of errors that occurred while generating the report.
   // Full error information is sent back with Misc Status Listener.
   repeated int64 error_ids = 9;
 
