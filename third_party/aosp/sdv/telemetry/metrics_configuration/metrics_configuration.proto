@@ -271,15 +271,13 @@ message Source {
 
 // Publishes messages from a customizable external service.
 message DataSource {
-  // Required.
-  // Unique source identifier.
+  // Optional (Deprecated: prefer `data_source_type` oneof).
+  // String source identifier used in metrics configurations up to Android 17.
   // Supported formats for reading data from SDV CORE service units:
   // - `FQIN|unit_name` to read from specific service_unit `unit_name` within a FQIN
   // - `UnitType` to read from a service_unit for the given type `UnitType`
   // - `UnitType|unit_name` to read from a service_unit `unit_name` for the given type `UnitType`
-  // - `pubsub:UnitType[topic_name]` to read from data tunnel publisher with topic `topic_name`
-  // - `rpc:UnitType[channel_name]` to read RPC server with channel `channel_name`
-  string source_identifier = 1;
+  string source_identifier = 1 [deprecated = true];
 
   // Defines connection behavior of Service Publisher.
   enum ConnectionType {
@@ -323,6 +321,72 @@ message DataSource {
   // Specifies whether to retrieve the last published message when subscribing to the service.
   // Only applicable to subscription connection type.
   bool fetch_last_message = 5;
+
+  // Identifies an SDV Comms PubSub (Data Tunnel) publisher.
+  message SdvPubSub {
+    // Required.
+    // The SDV service unit type (e.g., "com.sdv.telemetry.sample.TireSensorsReader#TirePressure").
+    optional string unit_type = 1;
+
+    // Required.
+    // The PubSub topic name.
+    optional string topic = 2;
+  }
+
+  // Identifies an SDV Comms RPC server.
+  message SdvRpc {
+    // Required.
+    // The SDV service unit type.
+    optional string unit_type = 1;
+
+    // Required.
+    // The RPC channel name.
+    optional string channel = 2;
+  }
+
+  // Identifies a publisher registered via Telemetry's Configurable Publisher Registry.
+  message RegisteredPublisher {
+    // Required.
+    // Name of the publisher registered via Telemetry's Configurable Publisher Registry.
+    optional string name = 1;
+  }
+
+  // Identifies a Vehicle HAL (VHAL) property on IVI.
+  message VehicleProperty {
+    // Required.
+    // Vehicle property ID.
+    optional int32 prop_id = 1;
+
+    // Optional.
+    // Property area ID (defaults to 0 for global properties).
+    optional int32 area_id = 2;
+  }
+
+  // Identifies the built-in NetworkStats data source on IVI.
+  message NetworkStats {
+    // Currently takes no parameters; reserved for future configuration fields.
+  }
+
+  // Identifies the built-in MemoryStats data source on IVI.
+  message MemoryStats {
+    // Currently takes no parameters; reserved for future configuration fields.
+  }
+
+  // Identifies the built-in statsd data source on IVI.
+  message Statsd {
+    // Currently takes no parameters (StatsdConfig is provided via `DataSource.configuration`).
+  }
+
+  // Specifies the service or data source to read from.
+  oneof data_source_type {
+    SdvPubSub sdv_pub_sub = 6;
+    SdvRpc sdv_rpc = 7;
+    RegisteredPublisher registered_publisher = 8;
+    VehicleProperty vehicle_property = 9;
+    NetworkStats network_stats = 10;
+    MemoryStats memory_stats = 11;
+    Statsd statsd = 12;
+  }
 }
 
 // When triggered uses message builder to create a new message according
