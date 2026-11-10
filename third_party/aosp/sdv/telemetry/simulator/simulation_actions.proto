@@ -37,7 +37,7 @@ message SimulationAction {
   oneof action {
     MetricsConfigAction metrics_config_action = 2;
     RemoveAllMetricsConfigsAction remove_all_metrics_configs_action = 3;
-  };
+  }
 }
 
 message MetricsConfigAction {

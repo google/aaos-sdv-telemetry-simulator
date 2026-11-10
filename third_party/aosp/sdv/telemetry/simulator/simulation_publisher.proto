@@ -69,7 +69,7 @@ message DataGenerator {
 }
 
 // CSV file format is header row followed by one row per message that will be
-// published. Header row needs contain "_delay_before_publishing" and one entry
+// published. Header row needs to contain "_delay_before_publishing" and one entry
 // for each primitive message field. The entry for each message field must be
 // parseable into the type specified in the message descriptor. Rows in the CSV
 // file starting with # will be treated as comments and ignored. The format of
